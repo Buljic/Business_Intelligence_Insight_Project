@@ -40,8 +40,9 @@ A comprehensive BI solution for monitoring e-commerce performance using modern d
 | Data Warehouse | PostgreSQL 15 | Storage, star schema, marts |
 | ETL/Orchestration | n8n | Workflow automation, data pipelines |
 | BI Dashboards | Apache Superset | Interactive visualizations |
-| ML Service | FastAPI + Prophet | Forecasting & anomaly detection |
+| ML Service | FastAPI + Prophet + ETS | Forecasting & anomaly detection (auto model selection) |
 | Containerization | Docker Compose | One-command deployment |
+| Streaming | Python micro-batch streamer | Simulated real-time ingestion |
 
 ## 🚀 Quick Start
 
@@ -104,6 +105,13 @@ Generates forecasts and detects anomalies.
 mart_daily_kpis → ML Service → Forecasts + Anomalies → Database + Reports
 ```
 
+### Optional: Streaming Micro-Batch
+Simulates near real-time ingestion by loading the CSV in small batches.
+
+```
+CSV → Streamer → raw_transactions → run_full_etl() → Dashboards/ML
+```
+
 ## 📈 Running the Workflows
 
 ### Step 1: Ingest Data (Workflow A)
@@ -129,6 +137,28 @@ mart_daily_kpis → ML Service → Forecasts + Anomalies → Database + Reports
 -- Run full ETL pipeline
 SELECT * FROM run_full_etl();
 ```
+
+## Streaming / Micro-Batch Mode (Optional)
+
+Use the streamer to simulate near real-time ingestion from the CSV. It ingests rows in batches, refreshes the warehouse, and can trigger ML training.
+
+```bash
+# Start streaming ingestion (micro-batch)
+docker-compose --profile streaming up -d streamer
+
+# Stop streaming
+docker-compose --profile streaming stop streamer
+
+# Run a one-off ETL cycle with logging (no streaming)
+docker-compose --profile streaming run --rm streamer python etl_runner.py
+```
+
+Key environment variables (see `docker-compose.yml`):
+- `BATCH_SIZE` (default 1000)
+- `SLEEP_SECONDS` (default 30)
+- `RUN_ETL` (default true)
+- `RUN_ML` (default false)
+- `STATE_PATH` (default `/data/stream_state.json`)
 
 ## 🎨 Dashboards
 
@@ -164,9 +194,10 @@ SELECT * FROM run_full_etl();
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/health` | Service health check |
-| POST | `/forecast` | Generate forecast for metric |
+| POST | `/forecast` | Generate forecast for metric (model: auto/prophet/ets) |
 | POST | `/anomalies` | Detect anomalies in metric |
 | POST | `/train` | Train all models & generate outputs |
+| POST | `/backtest/{metric}` | Backtest model performance |
 | GET | `/forecasts/latest` | Get latest forecasts |
 | GET | `/anomalies/latest` | Get latest anomalies |
 
@@ -175,13 +206,19 @@ SELECT * FROM run_full_etl();
 ```bash
 curl -X POST http://localhost:8000/forecast \
   -H "Content-Type: application/json" \
-  -d '{"metric": "total_revenue", "forecast_days": 7}'
+  -d '{"metric": "total_revenue", "forecast_days": 7, "model": "auto"}'
 ```
 
 ### Example: Run Full Training
 
 ```bash
 curl -X POST http://localhost:8000/train
+```
+
+### Example: Backtest a Model
+
+```bash
+curl -X POST "http://localhost:8000/backtest/total_revenue?model=ets&test_days=14"
 ```
 
 ## 📁 Project Structure
@@ -216,6 +253,11 @@ curl -X POST http://localhost:8000/train
 │
 ├── scripts/
 │   └── setup_superset.py       # Automated Superset setup
+│
+├── streaming/
+│   ├── Dockerfile              # Streaming micro-batch service
+│   ├── streamer.py             # CSV streamer + ETL trigger
+│   └── etl_runner.py           # One-off ETL runner with logging
 │
 ├── reports/                    # ML-generated reports
 │
@@ -264,6 +306,7 @@ docker-compose down -v
 - [Data Dictionary](docs/DATA_DICTIONARY.md) - Table and column definitions
 - [KPI Definitions](docs/KPI_DEFINITIONS.md) - Business logic for metrics
 - [Business Story](docs/BUSINESS_STORY.md) - Project narrative and insights
+- [Streaming Guide](docs/STREAMING.md) - Micro-batch ingestion instructions
 
 ## 🐛 Troubleshooting
 

@@ -73,6 +73,32 @@ services:
       postgres:
         condition: service_healthy
 
+  # Streaming Ingestion (micro-batch)
+  streamer:
+    build:
+      context: ./streaming
+      dockerfile: Dockerfile
+    container_name: ecommerce_streamer
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/ecommerce_dw
+      - CSV_PATH=/data/data.csv
+      - STATE_PATH=/data/stream_state.json
+      - BATCH_SIZE=1000
+      - SLEEP_SECONDS=30
+      - RUN_ETL=true
+      - RUN_ML=false
+      - ML_SERVICE_URL=http://ml_service:8000
+    volumes:
+      - ./data:/data
+      - ./streaming:/app
+    networks:
+      - ecommerce_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    profiles:
+      - streaming
+
   # Apache Superset - BI Dashboards
   superset:
     image: apache/superset:latest

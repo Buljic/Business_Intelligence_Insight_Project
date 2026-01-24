@@ -22,6 +22,7 @@ from pydantic import BaseModel
 from sqlalchemy import create_engine, text
 from prophet import Prophet
 from sklearn.ensemble import IsolationForest
+from statsmodels.tsa.holtwinters import ExponentialSmoothing
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -30,6 +31,19 @@ logger = logging.getLogger(__name__)
 # Service version for tracking
 SERVICE_VERSION = "2.0.0"
 CODE_VERSION = "2024.01.1"
+
+VALID_METRICS = [
+    "total_revenue",
+    "total_orders",
+    "unique_customers",
+    "avg_order_value",
+    "total_items_sold"
+]
+FORECAST_MODELS = {
+    "prophet": "Prophet",
+    "ets": "ETS"
+}
+DEFAULT_FORECAST_MODEL = "auto"
 
 # Database connection
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres123@localhost:5432/ecommerce_dw")
@@ -48,6 +62,7 @@ app = FastAPI(
 class ForecastRequest(BaseModel):
     metric: str = "total_revenue"
     forecast_days: int = 7
+    model: str = DEFAULT_FORECAST_MODEL
     
 class ForecastResponse(BaseModel):
     metric: str
@@ -74,6 +89,7 @@ class TrainResponse(BaseModel):
     forecasts_generated: int
     anomalies_detected: int
     report_path: Optional[str]
+    model_selection: Optional[Dict[str, str]] = None
 
 class HealthResponse(BaseModel):
     status: str
@@ -83,6 +99,7 @@ class HealthResponse(BaseModel):
 
 class BacktestResult(BaseModel):
     metric: str
+    model_type: str
     mape: float
     smape: float
     rmse: float
@@ -137,6 +154,25 @@ def naive_baseline_forecast(train: pd.Series, horizon: int) -> np.ndarray:
 # Helper Functions
 # ============================================
 
+def normalize_model_name(model: Optional[str]) -> str:
+    """Normalize and validate model name."""
+    if not model:
+        return DEFAULT_FORECAST_MODEL
+    model_key = model.strip().lower()
+    if model_key == DEFAULT_FORECAST_MODEL:
+        return model_key
+    if model_key not in FORECAST_MODELS:
+        raise ValueError(f"Invalid model. Choose from: {list(FORECAST_MODELS.keys()) + [DEFAULT_FORECAST_MODEL]}")
+    return model_key
+
+def prepare_metric_series(df: pd.DataFrame, metric: str) -> pd.DataFrame:
+    """Ensure daily continuity for time-series models."""
+    metric_df = df[['ds', metric]].dropna().copy()
+    metric_df = metric_df.set_index('ds').sort_index()
+    metric_df = metric_df.asfreq('D')
+    metric_df[metric] = metric_df[metric].fillna(0)
+    return metric_df.reset_index()
+
 def get_daily_kpis(metric: str = None) -> pd.DataFrame:
     """Fetch daily KPIs from database"""
     query = """
@@ -163,6 +199,83 @@ def train_prophet_model(df: pd.DataFrame, metric: str) -> Prophet:
     )
     model.fit(train_df)
     return model
+
+def train_ets_model(series: pd.Series) -> ExponentialSmoothing:
+    """Train ETS model for a specific metric series."""
+    model = ExponentialSmoothing(
+        series,
+        trend="add",
+        seasonal="add",
+        seasonal_periods=7,
+        initialization_method="estimated"
+    )
+    return model.fit(optimized=True)
+
+def build_forecast_records(dates: List[pd.Timestamp], predicted: np.ndarray,
+                           lower: np.ndarray, upper: np.ndarray) -> List[dict]:
+    """Normalize forecast outputs into API/DB-ready dicts."""
+    records = []
+    for idx, date in enumerate(dates):
+        records.append({
+            "date": date.strftime('%Y-%m-%d'),
+            "predicted": round(max(0, float(predicted[idx])), 2),
+            "lower_bound": round(max(0, float(lower[idx])), 2),
+            "upper_bound": round(max(0, float(upper[idx])), 2)
+        })
+    return records
+
+def forecast_with_model(df: pd.DataFrame, metric: str, model_type: str, forecast_days: int) -> Tuple[List[dict], dict]:
+    """Train selected model and return forecast records + parameters."""
+    prepared = prepare_metric_series(df, metric)
+    if prepared.empty:
+        raise ValueError("No data available for forecasting")
+
+    model_params = {}
+    if model_type == "prophet":
+        model = train_prophet_model(prepared, metric)
+        future = model.make_future_dataframe(periods=forecast_days, freq='D')
+        forecast = model.predict(future)
+        last_date = prepared['ds'].max()
+        future_forecast = forecast[forecast['ds'] > last_date]
+        records = build_forecast_records(
+            future_forecast['ds'].tolist(),
+            future_forecast['yhat'].values,
+            future_forecast['yhat_lower'].values,
+            future_forecast['yhat_upper'].values
+        )
+        model_params = {
+            "yearly_seasonality": True,
+            "weekly_seasonality": True,
+            "changepoint_prior_scale": 0.05,
+            "seasonality_prior_scale": 10
+        }
+        return records, model_params
+
+    if model_type == "ets":
+        series = prepared.set_index('ds')[metric]
+        if len(series) < 14:
+            raise ValueError("Insufficient data for ETS forecasting (need at least 14 days).")
+        fit = train_ets_model(series)
+        forecast_index = pd.date_range(series.index.max() + timedelta(days=1), periods=forecast_days, freq='D')
+        forecast = fit.forecast(forecast_days)
+        residuals = (series - fit.fittedvalues).dropna()
+        resid_std = float(np.std(residuals)) if not residuals.empty else 0.0
+        lower = forecast - (1.96 * resid_std)
+        upper = forecast + (1.96 * resid_std)
+        records = build_forecast_records(
+            forecast_index.tolist(),
+            forecast.values,
+            lower.values,
+            upper.values
+        )
+        model_params = {
+            "trend": "add",
+            "seasonal": "add",
+            "seasonal_periods": 7
+        }
+        return records, model_params
+
+    raise ValueError(f"Unsupported model: {model_type}")
 
 def detect_anomalies_enhanced(df: pd.DataFrame, metric: str, contamination: float = 0.1) -> pd.DataFrame:
     """
@@ -261,17 +374,21 @@ def detect_anomalies_enhanced(df: pd.DataFrame, metric: str, contamination: floa
     result = data[data['is_anomaly']].copy()
     return result
 
-def save_forecasts_to_db(forecasts: List[dict], metric: str, model_name: str = "Prophet"):
+def save_forecasts_to_db(forecasts: List[dict], metric: str, model_name: str,
+                         model_version: str, model_run_id: Optional[int] = None):
     """Save forecast results to database"""
     with engine.connect() as conn:
         for f in forecasts:
             conn.execute(text("""
                 INSERT INTO ml_forecast_daily (forecast_date, metric_name, predicted_value, 
-                                               lower_bound, upper_bound, model_name, model_version)
-                VALUES (:date, :metric, :predicted, :lower, :upper, :model, :version)
+                                               lower_bound, upper_bound, model_run_id,
+                                               model_name, model_version)
+                VALUES (:date, :metric, :predicted, :lower, :upper, :run_id, :model, :version)
                 ON CONFLICT (forecast_date, metric_name) 
                 DO UPDATE SET predicted_value = :predicted, lower_bound = :lower, 
-                              upper_bound = :upper, created_at = CURRENT_TIMESTAMP
+                              upper_bound = :upper, model_run_id = :run_id,
+                              model_name = :model, model_version = :version,
+                              updated_at = CURRENT_TIMESTAMP
             """), {
                 "date": f["date"],
                 "metric": metric,
@@ -279,7 +396,8 @@ def save_forecasts_to_db(forecasts: List[dict], metric: str, model_name: str = "
                 "lower": f["lower_bound"],
                 "upper": f["upper_bound"],
                 "model": model_name,
-                "version": "1.0"
+                "version": model_version,
+                "run_id": model_run_id
             })
         conn.commit()
 
@@ -328,11 +446,18 @@ def save_anomalies_to_db(anomalies: List[dict], metric: str, run_id: int = None)
             })
         conn.commit()
 
-def save_model_run(model_type: str, metric: str, train_start: str, train_end: str, 
-                   train_samples: int, params: dict, mape: float, smape: float, 
-                   rmse: float, mae: float, baseline_mape: float) -> int:
+def save_model_run(model_type: str, metric: str, train_start: str, train_end: str,
+                   train_samples: int, params: dict, mape: Optional[float], smape: Optional[float],
+                   rmse: Optional[float], mae: Optional[float], baseline_mape: Optional[float],
+                   baseline_rmse: Optional[float]) -> int:
     """Record model training run for reproducibility"""
-    improvement = ((baseline_mape - mape) / baseline_mape * 100) if baseline_mape > 0 else 0
+    def safe_round(value: Optional[float], digits: int = 4) -> Optional[float]:
+        return round(value, digits) if value is not None else None
+
+    if baseline_mape is not None and mape is not None and baseline_mape > 0:
+        improvement = ((baseline_mape - mape) / baseline_mape * 100)
+    else:
+        improvement = None
     
     with engine.connect() as conn:
         result = conn.execute(text("""
@@ -354,13 +479,13 @@ def save_model_run(model_type: str, metric: str, train_start: str, train_end: st
             "train_end": train_end,
             "samples": train_samples,
             "params": json.dumps(params),
-            "mape": round(mape, 4),
-            "smape": round(smape, 4),
-            "rmse": round(rmse, 4),
-            "mae": round(mae, 4),
-            "baseline_mape": round(baseline_mape, 4),
-            "baseline_rmse": round(rmse, 4),
-            "improvement": round(improvement, 4),
+            "mape": safe_round(mape),
+            "smape": safe_round(smape),
+            "rmse": safe_round(rmse),
+            "mae": safe_round(mae),
+            "baseline_mape": safe_round(baseline_mape),
+            "baseline_rmse": safe_round(baseline_rmse),
+            "improvement": safe_round(improvement),
             "model_version": SERVICE_VERSION,
             "code_version": CODE_VERSION
         })
@@ -368,55 +493,60 @@ def save_model_run(model_type: str, metric: str, train_start: str, train_end: st
         conn.commit()
         return run_id
 
-def backtest_model(df: pd.DataFrame, metric: str, test_days: int = 14) -> Dict:
+def backtest_model(df: pd.DataFrame, metric: str, model_type: str, test_days: int = 14) -> Dict:
     """
-    Perform time-series cross-validation backtest.
+    Perform time-series backtest for a specific model.
     Returns evaluation metrics and comparison vs naive baseline.
     """
-    if len(df) < test_days + 30:
+    prepared = prepare_metric_series(df, metric)
+    if len(prepared) < test_days + 30:
         raise ValueError(f"Insufficient data for backtesting. Need at least {test_days + 30} days.")
-    
-    # Split data
-    train_df = df.iloc[:-test_days].copy()
-    test_df = df.iloc[-test_days:].copy()
-    
-    # Train Prophet on training data
-    prophet_train = train_df[['ds', metric]].rename(columns={metric: 'y'})
-    model = Prophet(
-        yearly_seasonality=True,
-        weekly_seasonality=True,
-        daily_seasonality=False,
-        changepoint_prior_scale=0.05
-    )
-    model.fit(prophet_train)
-    
-    # Predict on test period
-    future = model.make_future_dataframe(periods=test_days)
-    forecast = model.predict(future)
-    predictions = forecast.iloc[-test_days:]['yhat'].values
-    
-    # Get actuals
+
+    train_df = prepared.iloc[:-test_days].copy()
+    test_df = prepared.iloc[-test_days:].copy()
     actuals = test_df[metric].values
-    
-    # Calculate naive baseline (last week = this week)
+
+    if model_type == "prophet":
+        prophet_train = train_df[['ds', metric]].rename(columns={metric: 'y'})
+        model = Prophet(
+            yearly_seasonality=True,
+            weekly_seasonality=True,
+            daily_seasonality=False,
+            changepoint_prior_scale=0.05
+        )
+        model.fit(prophet_train)
+        future = model.make_future_dataframe(periods=test_days, freq='D')
+        forecast = model.predict(future)
+        predictions = forecast.iloc[-test_days:]['yhat'].values
+    elif model_type == "ets":
+        series = train_df.set_index('ds')[metric]
+        fit = train_ets_model(series)
+        predictions = fit.forecast(test_days).values
+    else:
+        raise ValueError(f"Unsupported model: {model_type}")
+
+    predictions = np.clip(predictions, 0, None)
+
     baseline_preds = naive_baseline_forecast(train_df[metric], test_days)
-    
-    # Calculate metrics
+    baseline_rmse = calculate_rmse(actuals, baseline_preds)
+
     mape = calculate_mape(actuals, predictions)
     smape = calculate_smape(actuals, predictions)
     rmse = calculate_rmse(actuals, predictions)
     mae = calculate_mae(actuals, predictions)
     baseline_mape = calculate_mape(actuals, baseline_preds)
-    
+
     improvement = ((baseline_mape - mape) / baseline_mape * 100) if baseline_mape > 0 else 0
-    
+
     return {
         "metric": metric,
+        "model_type": model_type,
         "mape": round(mape, 2),
         "smape": round(smape, 2),
         "rmse": round(rmse, 2),
         "mae": round(mae, 2),
         "baseline_mape": round(baseline_mape, 2),
+        "baseline_rmse": round(baseline_rmse, 2),
         "improvement_pct": round(improvement, 2),
         "test_samples": test_days,
         "train_start": str(train_df['ds'].min().date()),
@@ -424,6 +554,20 @@ def backtest_model(df: pd.DataFrame, metric: str, test_days: int = 14) -> Dict:
         "predictions": predictions.tolist(),
         "actuals": actuals.tolist()
     }
+
+def select_best_model(df: pd.DataFrame, metric: str, test_days: int = 14) -> Tuple[str, List[Dict]]:
+    """Evaluate candidate models and select the best by MAPE."""
+    results = []
+    for model_type in FORECAST_MODELS.keys():
+        try:
+            result = backtest_model(df, metric, model_type, test_days)
+            results.append(result)
+        except Exception as exc:
+            logger.warning(f"Backtest failed for {metric} with {model_type}: {exc}")
+    if not results:
+        raise ValueError("No valid models available for selection")
+    best = sorted(results, key=lambda x: x["mape"])[0]
+    return best["model_type"], results
 
 def generate_report(forecasts: dict, anomalies: dict, report_path: str):
     """Generate markdown report for anomalies and forecasts"""
@@ -474,7 +618,7 @@ def generate_report(forecasts: dict, anomalies: dict, report_path: str):
             report_lines.append(f"  - Deviation: {a['deviation_pct']:+.1f}%\n")
     
     report_lines.append("\n---\n")
-    report_lines.append("*Report generated by E-Commerce ML Service v1.0*")
+    report_lines.append(f"*Report generated by E-Commerce ML Service v{SERVICE_VERSION}*")
     
     # Write report
     with open(report_path, 'w') as f:
@@ -491,8 +635,8 @@ async def root():
     """API root endpoint"""
     return {
         "service": "E-Commerce ML Service",
-        "version": "1.0.0",
-        "endpoints": ["/health", "/forecast", "/anomalies", "/train"]
+        "version": SERVICE_VERSION,
+        "endpoints": ["/health", "/forecast", "/anomalies", "/train", "/backtest/{metric}"]
     }
 
 @app.get("/health", response_model=HealthResponse)
@@ -522,44 +666,58 @@ async def health_check():
 @app.post("/forecast", response_model=ForecastResponse)
 async def generate_forecast(request: ForecastRequest):
     """Generate forecast for a specific metric"""
-    valid_metrics = ["total_revenue", "total_orders", "unique_customers", "avg_order_value", "total_items_sold"]
-    
-    if request.metric not in valid_metrics:
-        raise HTTPException(status_code=400, detail=f"Invalid metric. Choose from: {valid_metrics}")
-    
+    if request.metric not in VALID_METRICS:
+        raise HTTPException(status_code=400, detail=f"Invalid metric. Choose from: {VALID_METRICS}")
+
     try:
         df = get_daily_kpis()
         
         if df.empty:
             raise HTTPException(status_code=404, detail="No data available for forecasting")
-        
-        model = train_prophet_model(df, request.metric)
-        
-        # Create future dataframe
-        future = model.make_future_dataframe(periods=request.forecast_days)
-        forecast = model.predict(future)
-        
-        # Get only future predictions
-        last_date = df['ds'].max()
-        future_forecast = forecast[forecast['ds'] > last_date]
-        
-        forecasts = []
-        for _, row in future_forecast.iterrows():
-            forecasts.append({
-                "date": row['ds'].strftime('%Y-%m-%d'),
-                "predicted": round(max(0, row['yhat']), 2),
-                "lower_bound": round(max(0, row['yhat_lower']), 2),
-                "upper_bound": round(max(0, row['yhat_upper']), 2)
-            })
-        
-        # Save to database
-        save_forecasts_to_db(forecasts, request.metric)
-        
+
+        try:
+            model_choice = normalize_model_name(request.model)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        backtest_result = None
+
+        if model_choice == DEFAULT_FORECAST_MODEL:
+            model_choice, candidates = select_best_model(df, request.metric)
+            backtest_result = next(r for r in candidates if r["model_type"] == model_choice)
+        else:
+            backtest_result = backtest_model(df, request.metric, model_choice)
+
+        forecasts, model_params = forecast_with_model(df, request.metric, model_choice, request.forecast_days)
+        prepared = prepare_metric_series(df, request.metric)
+
+        run_id = save_model_run(
+            model_type=f"forecast_{model_choice}",
+            metric=request.metric,
+            train_start=str(prepared['ds'].min().date()),
+            train_end=str(prepared['ds'].max().date()),
+            train_samples=len(prepared),
+            params=model_params,
+            mape=backtest_result["mape"],
+            smape=backtest_result["smape"],
+            rmse=backtest_result["rmse"],
+            mae=backtest_result["mae"],
+            baseline_mape=backtest_result["baseline_mape"],
+            baseline_rmse=backtest_result["baseline_rmse"]
+        )
+
+        save_forecasts_to_db(
+            forecasts,
+            request.metric,
+            model_name=FORECAST_MODELS[model_choice],
+            model_version=SERVICE_VERSION,
+            model_run_id=run_id
+        )
+
         return ForecastResponse(
             metric=request.metric,
             forecasts=forecasts,
-            model_name="Prophet",
-            model_version="1.0",
+            model_name=FORECAST_MODELS[model_choice],
+            model_version=SERVICE_VERSION,
             created_at=datetime.now()
         )
         
@@ -571,7 +729,7 @@ async def generate_forecast(request: ForecastRequest):
 async def detect_anomalies_endpoint(request: AnomalyRequest):
     """Detect anomalies in a specific metric"""
     valid_metrics = ["total_revenue", "total_orders", "unique_customers", "avg_order_value"]
-    
+
     if request.metric not in valid_metrics:
         raise HTTPException(status_code=400, detail=f"Invalid metric. Choose from: {valid_metrics}")
     
@@ -586,7 +744,7 @@ async def detect_anomalies_endpoint(request: AnomalyRequest):
         df_recent = df[df['ds'] >= cutoff_date].copy()
         df_recent = df_recent.set_index('ds')
         
-        anomaly_df = detect_anomalies(df_recent, request.metric, request.contamination)
+        anomaly_df = detect_anomalies_enhanced(df_recent, request.metric, request.contamination)
         
         anomalies = []
         for date, row in anomaly_df.iterrows():
@@ -628,38 +786,49 @@ async def train_all_models(background_tasks: BackgroundTasks):
         
         all_forecasts = {}
         all_anomalies = {}
+        model_selection = {}
         total_forecasts = 0
         total_anomalies = 0
         
         for metric in metrics:
-            # Train and forecast
-            logger.info(f"Training model for {metric}")
-            model = train_prophet_model(df, metric)
-            
-            future = model.make_future_dataframe(periods=7)
-            forecast = model.predict(future)
-            
-            last_date = df['ds'].max()
-            future_forecast = forecast[forecast['ds'] > last_date]
-            
-            forecasts = []
-            for _, row in future_forecast.iterrows():
-                forecasts.append({
-                    "date": row['ds'].strftime('%Y-%m-%d'),
-                    "predicted": round(max(0, row['yhat']), 2),
-                    "lower_bound": round(max(0, row['yhat_lower']), 2),
-                    "upper_bound": round(max(0, row['yhat_upper']), 2)
-                })
-            
+            logger.info(f"Selecting best model for {metric}")
+            best_model, candidates = select_best_model(df, metric)
+            model_selection[metric] = best_model
+            backtest_result = next(r for r in candidates if r["model_type"] == best_model)
+
+            logger.info(f"Training {best_model} model for {metric}")
+            forecasts, model_params = forecast_with_model(df, metric, best_model, 7)
+            prepared = prepare_metric_series(df, metric)
+
+            run_id = save_model_run(
+                model_type=f"forecast_{best_model}",
+                metric=metric,
+                train_start=str(prepared['ds'].min().date()),
+                train_end=str(prepared['ds'].max().date()),
+                train_samples=len(prepared),
+                params=model_params,
+                mape=backtest_result["mape"],
+                smape=backtest_result["smape"],
+                rmse=backtest_result["rmse"],
+                mae=backtest_result["mae"],
+                baseline_mape=backtest_result["baseline_mape"],
+                baseline_rmse=backtest_result["baseline_rmse"]
+            )
+
             all_forecasts[metric] = forecasts
-            save_forecasts_to_db(forecasts, metric)
+            save_forecasts_to_db(
+                forecasts,
+                metric,
+                model_name=FORECAST_MODELS[best_model],
+                model_version=SERVICE_VERSION,
+                model_run_id=run_id
+            )
             total_forecasts += len(forecasts)
-            
-            # Detect anomalies
+
             logger.info(f"Detecting anomalies for {metric}")
             df_indexed = df.set_index('ds')
-            anomaly_df = detect_anomalies(df_indexed, metric)
-            
+            anomaly_df = detect_anomalies_enhanced(df_indexed, metric)
+
             anomalies = []
             for date, row in anomaly_df.iterrows():
                 anomalies.append({
@@ -670,10 +839,24 @@ async def train_all_models(background_tasks: BackgroundTasks):
                     "anomaly_type": row['anomaly_type'],
                     "severity": row['severity']
                 })
-            
+
             all_anomalies[metric] = anomalies
             if anomalies:
-                save_anomalies_to_db(anomalies, metric)
+                anomaly_run_id = save_model_run(
+                    model_type="anomaly_isolation_forest",
+                    metric=metric,
+                    train_start=str(df['ds'].min().date()),
+                    train_end=str(df['ds'].max().date()),
+                    train_samples=len(df),
+                    params={"contamination": 0.1},
+                    mape=None,
+                    smape=None,
+                    rmse=None,
+                    mae=None,
+                    baseline_mape=None,
+                    baseline_rmse=None
+                )
+                save_anomalies_to_db(anomalies, metric, run_id=anomaly_run_id)
             total_anomalies += len(anomalies)
         
         # Generate report
@@ -685,7 +868,8 @@ async def train_all_models(background_tasks: BackgroundTasks):
             metrics_trained=metrics,
             forecasts_generated=total_forecasts,
             anomalies_detected=total_anomalies,
-            report_path=report_path
+            report_path=report_path,
+            model_selection=model_selection
         )
         
     except Exception as e:
@@ -749,24 +933,33 @@ async def get_active_alerts():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/backtest/{metric}", response_model=BacktestResult)
-async def run_backtest(metric: str, test_days: int = 14):
+async def run_backtest(metric: str, test_days: int = 14, model: str = DEFAULT_FORECAST_MODEL):
     """Run backtest for a specific metric and return evaluation metrics"""
     valid_metrics = ["total_revenue", "total_orders"]
-    
+
     if metric not in valid_metrics:
         raise HTTPException(status_code=400, detail=f"Invalid metric. Choose from: {valid_metrics}")
-    
+
     try:
         df = get_daily_kpis()
-        
+
         if len(df) < test_days + 30:
-            raise HTTPException(status_code=400, 
+            raise HTTPException(status_code=400,
                 detail=f"Insufficient data. Need at least {test_days + 30} days, have {len(df)}.")
-        
-        result = backtest_model(df, metric, test_days)
-        
+
+        try:
+            model_choice = normalize_model_name(model)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+        if model_choice == DEFAULT_FORECAST_MODEL:
+            model_choice, candidates = select_best_model(df, metric, test_days)
+            result = next(r for r in candidates if r["model_type"] == model_choice)
+        else:
+            result = backtest_model(df, metric, model_choice, test_days)
+
         return BacktestResult(
             metric=result["metric"],
+            model_type=result["model_type"],
             mape=result["mape"],
             smape=result["smape"],
             rmse=result["rmse"],
@@ -775,7 +968,7 @@ async def run_backtest(metric: str, test_days: int = 14):
             improvement_pct=result["improvement_pct"],
             test_samples=result["test_samples"]
         )
-        
+
     except Exception as e:
         logger.error(f"Backtest error: {e}")
         raise HTTPException(status_code=500, detail=str(e))

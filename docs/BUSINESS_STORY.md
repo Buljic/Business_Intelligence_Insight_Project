@@ -173,10 +173,10 @@ Raw Data → Clean Data → Star Schema → BI Marts → Dashboards + ML
 
 **The Insight:** Machine learning predicts next 7 days of revenue and orders.
 
-**Model:** Facebook Prophet (time series forecasting)
-- Captures yearly seasonality (holidays, seasons)
-- Captures weekly patterns (weekday vs weekend)
-- Provides confidence intervals
+**Models:** Prophet + ETS (auto-selected via backtesting)
+- Captures weekly and yearly seasonality
+- Compares models vs naive baseline (MAPE)
+- Provides confidence intervals for planning
 
 **Dashboard Elements:**
 - Actual vs Predicted line chart
@@ -197,10 +197,10 @@ Raw Data → Clean Data → Star Schema → BI Marts → Dashboards + ML
 
 **The Insight:** Automatic detection of unusual patterns requiring attention.
 
-**Model:** Isolation Forest (unsupervised anomaly detection)
+**Model:** Isolation Forest with seasonality-aware baseline
 - Flags deviations from expected values
 - Classifies severity: Critical, High, Medium, Low
-- Identifies spikes AND drops
+- Identifies spikes AND drops with business context
 
 **Alert Examples:**
 
@@ -268,7 +268,7 @@ Raw Data → Clean Data → Star Schema → BI Marts → Dashboards + ML
 
 ### Phase 2 Enhancements
 
-1. **Real-time streaming** for instant anomaly alerts
+1. **Near real-time streaming** for faster anomaly alerts
 2. **Product recommendations** using collaborative filtering
 3. **Customer churn prediction** model
 4. **Price optimization** based on elasticity analysis

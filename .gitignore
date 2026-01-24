@@ -23,6 +23,8 @@ Thumbs.db
 
 # Data (keep sample, ignore large files)
 # data.csv is tracked for this project
+data/stream_state.json
+data/stream_data.csv
 
 # Reports (generated)
 reports/*.md

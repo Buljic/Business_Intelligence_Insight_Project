@@ -286,7 +286,8 @@ BEGIN
     INSERT INTO mart_daily_kpis (
         date_key, full_date, total_revenue, total_orders, total_items_sold,
         unique_customers, avg_order_value, cancelled_orders, cancelled_revenue,
-        return_orders, return_revenue, cancellation_rate, return_rate
+        return_orders, return_revenue, cancellation_rate, return_rate,
+        new_customers, repeat_customers
     )
     SELECT 
         fs.date_key,
@@ -314,10 +315,18 @@ BEGIN
             WHEN COUNT(DISTINCT fs.invoice_no) > 0 
             THEN COUNT(DISTINCT CASE WHEN fs.is_return THEN fs.invoice_no END)::DECIMAL / COUNT(DISTINCT fs.invoice_no)
             ELSE 0 
-        END as return_rate
+        END as return_rate,
+        COALESCE(nc.new_customers, 0) as new_customers,
+        GREATEST(COUNT(DISTINCT fs.customer_key) - COALESCE(nc.new_customers, 0), 0) as repeat_customers
     FROM fact_sales fs
     JOIN dim_date dd ON fs.date_key = dd.date_key
-    GROUP BY fs.date_key, dd.full_date
+    LEFT JOIN (
+        SELECT first_purchase_date, COUNT(*) as new_customers
+        FROM dim_customer
+        WHERE first_purchase_date IS NOT NULL
+        GROUP BY first_purchase_date
+    ) nc ON dd.full_date = nc.first_purchase_date
+    GROUP BY fs.date_key, dd.full_date, nc.new_customers
     ORDER BY dd.full_date;
     
     GET DIAGNOSTICS rows_affected = ROW_COUNT;

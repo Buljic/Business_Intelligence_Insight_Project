@@ -176,9 +176,9 @@ SELECT
     trl.last_refresh_at as data_freshness
 FROM mart_daily_kpis mdk
 LEFT JOIN ml_forecast_daily fr 
-    ON mdk.full_date = fr.forecast_date AND fr.metric_name = 'revenue'
+    ON mdk.full_date = fr.forecast_date AND fr.metric_name = 'total_revenue'
 LEFT JOIN ml_forecast_daily fo 
-    ON mdk.full_date = fo.forecast_date AND fo.metric_name = 'orders'
+    ON mdk.full_date = fo.forecast_date AND fo.metric_name = 'total_orders'
 LEFT JOIN table_refresh_log trl 
     ON trl.table_name = 'mart_daily_kpis'
 ORDER BY mdk.full_date DESC;
