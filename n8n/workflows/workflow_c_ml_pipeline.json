@@ -1,0 +1,244 @@
+{
+  "name": "Workflow C - ML Pipeline",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start-node",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Daily Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 500]
+    },
+    {
+      "parameters": {
+        "url": "http://ml_service:8000/health",
+        "options": {}
+      },
+      "id": "health-check",
+      "name": "Check ML Service Health",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [500, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.database_connected }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "if-healthy",
+      "name": "If Healthy",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [700, 400]
+    },
+    {
+      "parameters": {
+        "url": "http://ml_service:8000/train",
+        "method": "POST",
+        "options": {
+          "timeout": 300000
+        }
+      },
+      "id": "train-models",
+      "name": "Train Models & Generate Forecasts",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [950, 350]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM ml_anomalies_daily WHERE severity IN ('critical', 'high') AND anomaly_date >= CURRENT_DATE - INTERVAL '7 days' ORDER BY anomaly_date DESC;",
+        "additionalFields": {}
+      },
+      "id": "get-alerts",
+      "name": "Get Recent Alerts",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1200, 350],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E-Commerce DW"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "number": [
+            {
+              "value1": "={{ $json.length }}",
+              "operation": "larger",
+              "value2": 0
+            }
+          ]
+        }
+      },
+      "id": "if-alerts",
+      "name": "Has Alerts?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1400, 350]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate alert summary\nconst alerts = $input.all();\nconst criticalAlerts = alerts.filter(a => a.json.severity === 'critical');\nconst highAlerts = alerts.filter(a => a.json.severity === 'high');\n\nlet summary = `# ML Anomaly Alert Report\\n\\n`;\nsummary += `**Generated:** ${new Date().toISOString()}\\n\\n`;\nsummary += `## Summary\\n`;\nsummary += `- Critical Alerts: ${criticalAlerts.length}\\n`;\nsummary += `- High Priority Alerts: ${highAlerts.length}\\n\\n`;\n\nif (criticalAlerts.length > 0) {\n  summary += `## ⚠️ Critical Alerts\\n\\n`;\n  for (const alert of criticalAlerts) {\n    summary += `### ${alert.json.metric_name} - ${alert.json.anomaly_date}\\n`;\n    summary += `- **Type:** ${alert.json.anomaly_type}\\n`;\n    summary += `- **Actual:** ${alert.json.actual_value}\\n`;\n    summary += `- **Expected:** ${alert.json.expected_value}\\n`;\n    summary += `- **Deviation:** ${alert.json.deviation_pct}%\\n\\n`;\n  }\n}\n\nreturn [{ json: { report: summary, alertCount: alerts.length } }];"
+      },
+      "id": "generate-alert-report",
+      "name": "Generate Alert Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1650, 300]
+    },
+    {
+      "parameters": {
+        "content": "## Workflow C: ML Pipeline\n\n**Purpose:** Run ML forecasting and anomaly detection\n\n**Steps:**\n1. Check ML service health\n2. Train models (Prophet for forecasting)\n3. Generate 7-day forecasts for revenue & orders\n4. Detect anomalies using Isolation Forest\n5. Save results to database\n6. Generate alert report if anomalies found\n\n**Schedule:** Daily\n\n**ML Service Endpoints:**\n- POST /train - Train all models\n- POST /forecast - Generate forecasts\n- POST /anomalies - Detect anomalies",
+        "height": 380,
+        "width": 380
+      },
+      "id": "sticky-note",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [240, 60]
+    },
+    {
+      "parameters": {
+        "content": "No anomalies detected - Pipeline complete"
+      },
+      "id": "no-alerts-note",
+      "name": "No Alerts",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [1650, 450]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Check ML Service Health",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Schedule": {
+      "main": [
+        [
+          {
+            "node": "Check ML Service Health",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check ML Service Health": {
+      "main": [
+        [
+          {
+            "node": "If Healthy",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Healthy": {
+      "main": [
+        [
+          {
+            "node": "Train Models & Generate Forecasts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Train Models & Generate Forecasts": {
+      "main": [
+        [
+          {
+            "node": "Get Recent Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Recent Alerts": {
+      "main": [
+        [
+          {
+            "node": "Has Alerts?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Alerts?": {
+      "main": [
+        [
+          {
+            "node": "Generate Alert Report",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Alerts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "ML",
+      "id": "4"
+    },
+    {
+      "name": "Forecasting",
+      "id": "5"
+    },
+    {
+      "name": "Anomaly Detection",
+      "id": "6"
+    }
+  ]
+}

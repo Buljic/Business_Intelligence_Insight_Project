@@ -1,0 +1,231 @@
+<mxfile host="app.diagrams.net" modified="2024-01-24T12:00:00.000Z" agent="Mozilla/5.0" version="22.1.0" type="device">
+  <diagram name="ETL Flow" id="etl-flow-diagram">
+    <mxGraphModel dx="1434" dy="780" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Title -->
+        <mxCell id="title" value="E-Commerce BI Platform - ETL &amp; Data Flow" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="400" y="20" width="500" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- WORKFLOW A SECTION -->
+        <mxCell id="wf_a_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;dashPattern=8 8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="380" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="wf_a_title" value="Workflow A: CSV Ingestion" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="50" y="85" width="200" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- CSV Source -->
+        <mxCell id="csv" value="📄 data.csv&#xa;(Kaggle Dataset)&#xa;541K records" style="shape=document;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="60" y="130" width="100" height="70" as="geometry" />
+        </mxCell>
+        
+        <!-- n8n Read -->
+        <mxCell id="n8n_read" value="📖 n8n&#xa;Read CSV" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="190" y="140" width="80" height="50" as="geometry" />
+        </mxCell>
+        
+        <!-- Batch -->
+        <mxCell id="batch" value="📦 Batch&#xa;(1000 rows)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="300" y="140" width="80" height="50" as="geometry" />
+        </mxCell>
+        
+        <!-- Raw Table -->
+        <mxCell id="raw_table" value="🗃️ raw_transactions&#xa;(Landing Zone)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="290" y="210" width="110" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrows WF A -->
+        <mxCell id="arr1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;" edge="1" parent="1" source="csv" target="n8n_read">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;" edge="1" parent="1" source="n8n_read" target="batch">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;" edge="1" parent="1" source="batch" target="raw_table">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- WORKFLOW B SECTION -->
+        <mxCell id="wf_b_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;dashPattern=8 8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="300" width="700" height="280" as="geometry" />
+        </mxCell>
+        <mxCell id="wf_b_title" value="Workflow B: ETL Transforms (every 6 hours)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="50" y="305" width="300" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Staging -->
+        <mxCell id="staging" value="🧹 stg_transactions_clean&#xa;• Type casting&#xa;• Null handling&#xa;• Cancel/Return flags&#xa;• line_total calc" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="60" y="350" width="150" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- Dimensions -->
+        <mxCell id="dims_box" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="240" y="340" width="180" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="dims_title" value="Dimensions" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="285" y="345" width="90" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="dim_d" value="📅 dim_date" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="250" y="370" width="75" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="dim_c" value="👤 dim_customer" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="335" y="370" width="75" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="dim_p" value="📦 dim_product" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="250" y="410" width="75" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="dim_co" value="🌍 dim_country" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="335" y="410" width="75" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Fact -->
+        <mxCell id="fact" value="⭐ fact_sales&#xa;(Star Schema)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="450" y="370" width="100" height="70" as="geometry" />
+        </mxCell>
+        
+        <!-- Marts -->
+        <mxCell id="marts_box" value="" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="580" y="340" width="150" height="140" as="geometry" />
+        </mxCell>
+        <mxCell id="marts_title" value="BI Marts" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="620" y="345" width="70" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="mart1" value="📊 mart_daily_kpis" style="rounded=0;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="590" y="370" width="130" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="mart2" value="👥 mart_rfm" style="rounded=0;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="590" y="400" width="130" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="mart3" value="🌍 mart_country_perf" style="rounded=0;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="590" y="430" width="130" height="25" as="geometry" />
+        </mxCell>
+        <mxCell id="mart4" value="📦 mart_product_perf" style="rounded=0;whiteSpace=wrap;html=1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="590" y="460" width="130" height="25" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrows WF B -->
+        <mxCell id="arr4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;" edge="1" parent="1" source="raw_table" target="staging">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;" edge="1" parent="1" source="staging" target="dims_box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;" edge="1" parent="1" source="dims_box" target="fact">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;" edge="1" parent="1" source="fact" target="marts_box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- WORKFLOW C SECTION -->
+        <mxCell id="wf_c_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;dashed=1;dashPattern=8 8;" vertex="1" parent="1">
+          <mxGeometry x="40" y="600" width="700" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="wf_c_title" value="Workflow C: ML Pipeline (daily)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="50" y="605" width="250" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- ML Input -->
+        <mxCell id="ml_input" value="📊 mart_daily_kpis" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="60" y="660" width="120" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- FastAPI -->
+        <mxCell id="fastapi" value="🤖 FastAPI ML Service&#xa;• Prophet Forecasting&#xa;• Isolation Forest&#xa;  Anomaly Detection" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=10;" vertex="1" parent="1">
+          <mxGeometry x="220" y="650" width="160" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- ML Outputs -->
+        <mxCell id="ml_forecast" value="📈 ml_forecast_daily&#xa;(7-day predictions)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="420" y="640" width="130" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="ml_anomaly" value="⚠️ ml_anomalies_daily&#xa;(Alerts)" style="shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="420" y="710" width="130" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Report -->
+        <mxCell id="report" value="📝 ML Report&#xa;(Markdown)" style="shape=document;whiteSpace=wrap;html=1;boundedLbl=1;fillColor=#e1d5e7;strokeColor=#9673a6;" vertex="1" parent="1">
+          <mxGeometry x="590" y="660" width="100" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrows WF C -->
+        <mxCell id="arr8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;" edge="1" parent="1" source="ml_input" target="fastapi">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;" edge="1" parent="1" source="fastapi" target="ml_forecast">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;" edge="1" parent="1" source="fastapi" target="ml_anomaly">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr11" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;" edge="1" parent="1" source="ml_anomaly" target="report">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- SUPERSET SECTION -->
+        <mxCell id="superset_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e6f2ff;strokeColor=#0066cc;dashed=1;dashPattern=8 8;" vertex="1" parent="1">
+          <mxGeometry x="780" y="300" width="200" height="480" as="geometry" />
+        </mxCell>
+        <mxCell id="superset_title" value="Apache Superset&#xa;(BI Dashboards)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="795" y="310" width="170" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="dash1" value="📊 Executive Overview&#xa;• Revenue trends&#xa;• Orders trends&#xa;• KPI cards" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;align=left;spacingLeft=5;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="800" y="360" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="dash2" value="👥 Customer Value&#xa;• RFM segments&#xa;• Customer tiers&#xa;• Value distribution" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;align=left;spacingLeft=5;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="800" y="440" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="dash3" value="📦 Product Performance&#xa;• Top SKUs&#xa;• Revenue by product&#xa;• Trends" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;spacingLeft=5;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="800" y="520" width="160" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="dash4" value="🤖 AI/ML Dashboard&#xa;• Actual vs Forecast&#xa;• Anomaly alerts&#xa;• Predictions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;align=left;spacingLeft=5;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="800" y="600" width="160" height="70" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrows to Superset -->
+        <mxCell id="arr12" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#0066cc;strokeWidth=2;" edge="1" parent="1" source="marts_box" target="superset_box">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arr13" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;endArrow=classic;endFill=1;strokeColor=#0066cc;strokeWidth=2;" edge="1" parent="1" source="ml_forecast" target="dash4">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="560" y="670" />
+              <mxPoint x="560" y="800" />
+              <mxPoint x="780" y="800" />
+              <mxPoint x="780" y="635" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Legend -->
+        <mxCell id="legend" value="Technology Stack" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=26;fillColor=#f5f5f5;strokeColor=#666666;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="300" width="160" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="leg1" value="📄 CSV File (Source)" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry y="26" width="160" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="leg2" value="🔵 n8n (Orchestration)" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry y="48" width="160" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="leg3" value="🗃️ PostgreSQL (Storage)" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry y="70" width="160" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="leg4" value="🤖 FastAPI (ML Service)" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry y="92" width="160" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="leg5" value="📊 Superset (Dashboards)" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry y="114" width="160" height="22" as="geometry" />
+        </mxCell>
+        <mxCell id="leg6" value="📝 Reports (Output)" style="text;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;spacingLeft=4;spacingRight=4;overflow=hidden;rotatable=0;fontSize=10;" vertex="1" parent="legend">
+          <mxGeometry y="136" width="160" height="22" as="geometry" />
+        </mxCell>
+        
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

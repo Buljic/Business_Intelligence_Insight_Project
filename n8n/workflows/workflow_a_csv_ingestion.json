@@ -1,0 +1,142 @@
+{
+  "name": "Workflow A - CSV Data Ingestion",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start-node",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "filePath": "/data/data.csv",
+        "options": {
+          "headerRow": true
+        }
+      },
+      "id": "read-csv",
+      "name": "Read CSV File",
+      "type": "n8n-nodes-base.readBinaryFiles",
+      "typeVersion": 1,
+      "position": [450, 300],
+      "notes": "Reads the e-commerce data CSV file"
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "options": {
+          "headerRow": true
+        }
+      },
+      "id": "csv-to-json",
+      "name": "CSV to JSON",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 1,
+      "position": [650, 300]
+    },
+    {
+      "parameters": {
+        "batchSize": 1000,
+        "options": {}
+      },
+      "id": "split-batches",
+      "name": "Split Into Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [850, 300]
+    },
+    {
+      "parameters": {
+        "resource": "database",
+        "operation": "executeQuery",
+        "query": "INSERT INTO raw_transactions (invoice_no, stock_code, description, quantity, invoice_date, unit_price, customer_id, country)\nSELECT \n  item->>'InvoiceNo',\n  item->>'StockCode',\n  item->>'Description',\n  (item->>'Quantity')::INTEGER,\n  TO_TIMESTAMP(item->>'InvoiceDate', 'MM/DD/YYYY HH24:MI'),\n  (item->>'UnitPrice')::DECIMAL(10,2),\n  item->>'CustomerID',\n  item->>'Country'\nFROM json_array_elements($1::json) AS item\nON CONFLICT DO NOTHING;",
+        "additionalFields": {}
+      },
+      "id": "postgres-insert",
+      "name": "Insert to PostgreSQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1050, 300],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E-Commerce DW"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Workflow A: CSV Data Ingestion\n\n**Purpose:** Load raw e-commerce data from CSV into PostgreSQL\n\n**Steps:**\n1. Read CSV file from /data/data.csv\n2. Convert to JSON format\n3. Split into batches of 1000 records\n4. Insert into raw_transactions table\n\n**Credentials Required:**\n- PostgreSQL connection to ecommerce_dw database",
+        "height": 280,
+        "width": 320
+      },
+      "id": "sticky-note",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [240, 60]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Read CSV File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read CSV File": {
+      "main": [
+        [
+          {
+            "node": "CSV to JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "CSV to JSON": {
+      "main": [
+        [
+          {
+            "node": "Split Into Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Into Batches": {
+      "main": [
+        [
+          {
+            "node": "Insert to PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "ETL",
+      "id": "1"
+    },
+    {
+      "name": "Ingestion",
+      "id": "2"
+    }
+  ]
+}

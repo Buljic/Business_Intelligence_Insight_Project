@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+ENV/
+.env
+
+# Docker
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Data (keep sample, ignore large files)
+# data.csv is tracked for this project
+
+# Reports (generated)
+reports/*.md
+!reports/.gitkeep
+
+# Volumes (Docker managed)
+postgres_data/
+n8n_data/
+superset_data/
+
+# Temporary
+*.tmp
+*.bak

@@ -1,0 +1,330 @@
+{
+  "name": "Workflow B - ETL Transforms",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "start-node",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [250, 500]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT refresh_staging();",
+        "additionalFields": {}
+      },
+      "id": "refresh-staging",
+      "name": "1. Refresh Staging",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [500, 400],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E-Commerce DW"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT refresh_dim_country();",
+        "additionalFields": {}
+      },
+      "id": "refresh-dim-country",
+      "name": "2. Refresh dim_country",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [700, 400],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E-Commerce DW"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT refresh_dim_product();",
+        "additionalFields": {}
+      },
+      "id": "refresh-dim-product",
+      "name": "3. Refresh dim_product",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [900, 400],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E-Commerce DW"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT refresh_dim_customer();",
+        "additionalFields": {}
+      },
+      "id": "refresh-dim-customer",
+      "name": "4. Refresh dim_customer",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1100, 400],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E-Commerce DW"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT refresh_fact_sales();",
+        "additionalFields": {}
+      },
+      "id": "refresh-fact-sales",
+      "name": "5. Refresh fact_sales",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1300, 400],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E-Commerce DW"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT refresh_mart_daily_kpis();",
+        "additionalFields": {}
+      },
+      "id": "refresh-mart-daily",
+      "name": "6. Refresh mart_daily_kpis",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1500, 400],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E-Commerce DW"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT refresh_mart_rfm();",
+        "additionalFields": {}
+      },
+      "id": "refresh-mart-rfm",
+      "name": "7. Refresh mart_rfm",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1700, 400],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E-Commerce DW"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT refresh_mart_country_performance();",
+        "additionalFields": {}
+      },
+      "id": "refresh-mart-country",
+      "name": "8. Refresh mart_country",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [1900, 400],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E-Commerce DW"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT refresh_mart_product_performance();",
+        "additionalFields": {}
+      },
+      "id": "refresh-mart-product",
+      "name": "9. Refresh mart_product",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [2100, 400],
+      "credentials": {
+        "postgres": {
+          "id": "1",
+          "name": "PostgreSQL - E-Commerce DW"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Workflow B: ETL Transforms\n\n**Purpose:** Transform raw data into star schema and refresh BI marts\n\n**Execution Order:**\n1. Staging (clean & validate raw data)\n2. Dimensions (country, product, customer)\n3. Fact table (sales)\n4. Marts (daily KPIs, RFM, country, product)\n\n**Schedule:** Every 6 hours\n\n**Dependencies:** Workflow A must run first",
+        "height": 300,
+        "width": 350
+      },
+      "id": "sticky-note",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [240, 60]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "1. Refresh Staging",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "1. Refresh Staging",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "1. Refresh Staging": {
+      "main": [
+        [
+          {
+            "node": "2. Refresh dim_country",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "2. Refresh dim_country": {
+      "main": [
+        [
+          {
+            "node": "3. Refresh dim_product",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "3. Refresh dim_product": {
+      "main": [
+        [
+          {
+            "node": "4. Refresh dim_customer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "4. Refresh dim_customer": {
+      "main": [
+        [
+          {
+            "node": "5. Refresh fact_sales",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "5. Refresh fact_sales": {
+      "main": [
+        [
+          {
+            "node": "6. Refresh mart_daily_kpis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "6. Refresh mart_daily_kpis": {
+      "main": [
+        [
+          {
+            "node": "7. Refresh mart_rfm",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "7. Refresh mart_rfm": {
+      "main": [
+        [
+          {
+            "node": "8. Refresh mart_country",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "8. Refresh mart_country": {
+      "main": [
+        [
+          {
+            "node": "9. Refresh mart_product",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "ETL",
+      "id": "1"
+    },
+    {
+      "name": "Star Schema",
+      "id": "3"
+    }
+  ]
+}
