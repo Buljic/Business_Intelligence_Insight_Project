@@ -1,12 +1,19 @@
 """
 E-Commerce ML Microservice
 Provides forecasting and anomaly detection for daily KPIs
+
+Enhanced with:
+- Backtesting and evaluation metrics (MAPE, SMAPE, baseline comparison)
+- Model run tracking for reproducibility
+- Improved anomaly detection with seasonality awareness
+- Idempotent database operations
 """
 
 import os
 import logging
+import json
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import Optional, List, Dict, Tuple
 
 import numpy as np
 import pandas as pd
@@ -20,14 +27,18 @@ from sklearn.ensemble import IsolationForest
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Service version for tracking
+SERVICE_VERSION = "2.0.0"
+CODE_VERSION = "2024.01.1"
+
 # Database connection
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres123@localhost:5432/ecommerce_dw")
 engine = create_engine(DATABASE_URL)
 
 app = FastAPI(
     title="E-Commerce ML Service",
-    description="Forecasting and Anomaly Detection for E-Commerce KPIs",
-    version="1.0.0"
+    description="Forecasting and Anomaly Detection for E-Commerce KPIs with Backtesting",
+    version=SERVICE_VERSION
 )
 
 # ============================================
@@ -70,6 +81,58 @@ class HealthResponse(BaseModel):
     last_data_date: Optional[str]
     total_records: int
 
+class BacktestResult(BaseModel):
+    metric: str
+    mape: float
+    smape: float
+    rmse: float
+    mae: float
+    baseline_mape: float
+    improvement_pct: float
+    test_samples: int
+
+class ModelRunResponse(BaseModel):
+    run_id: int
+    model_type: str
+    target_metric: str
+    mape: float
+    baseline_mape: float
+    improvement_pct: float
+    status: str
+
+# ============================================
+# Evaluation Metrics
+# ============================================
+
+def calculate_mape(actual: np.ndarray, predicted: np.ndarray) -> float:
+    """Mean Absolute Percentage Error"""
+    mask = actual != 0
+    if not mask.any():
+        return 0.0
+    return float(np.mean(np.abs((actual[mask] - predicted[mask]) / actual[mask])) * 100)
+
+def calculate_smape(actual: np.ndarray, predicted: np.ndarray) -> float:
+    """Symmetric Mean Absolute Percentage Error"""
+    denominator = (np.abs(actual) + np.abs(predicted)) / 2
+    mask = denominator != 0
+    if not mask.any():
+        return 0.0
+    return float(np.mean(np.abs(actual[mask] - predicted[mask]) / denominator[mask]) * 100)
+
+def calculate_rmse(actual: np.ndarray, predicted: np.ndarray) -> float:
+    """Root Mean Square Error"""
+    return float(np.sqrt(np.mean((actual - predicted) ** 2)))
+
+def calculate_mae(actual: np.ndarray, predicted: np.ndarray) -> float:
+    """Mean Absolute Error"""
+    return float(np.mean(np.abs(actual - predicted)))
+
+def naive_baseline_forecast(train: pd.Series, horizon: int) -> np.ndarray:
+    """Naive baseline: last week's values = this week's forecast"""
+    if len(train) < 7:
+        return np.array([train.mean()] * horizon)
+    return np.array([train.iloc[-(7 - i % 7)] for i in range(horizon)])
+
 # ============================================
 # Helper Functions
 # ============================================
@@ -101,33 +164,102 @@ def train_prophet_model(df: pd.DataFrame, metric: str) -> Prophet:
     model.fit(train_df)
     return model
 
-def detect_anomalies(df: pd.DataFrame, metric: str, contamination: float = 0.1) -> pd.DataFrame:
-    """Detect anomalies using Isolation Forest"""
-    data = df[[metric]].dropna()
+def detect_anomalies_enhanced(df: pd.DataFrame, metric: str, contamination: float = 0.1) -> pd.DataFrame:
+    """
+    Enhanced anomaly detection with seasonality awareness.
+    Uses forecast residuals for better anomaly identification.
+    """
+    data = df[[metric]].dropna().copy()
     
-    if len(data) < 10:
+    if len(data) < 14:
         return pd.DataFrame()
     
-    model = IsolationForest(contamination=contamination, random_state=42)
-    data['anomaly'] = model.fit_predict(data[[metric]])
-    data['is_anomaly'] = data['anomaly'] == -1
+    # Add day of week for seasonality
+    data['day_of_week'] = data.index.dayofweek
+    data['is_weekend'] = data['day_of_week'].isin([5, 6])
     
-    # Calculate expected value (rolling mean)
-    data['expected'] = data[metric].rolling(window=7, min_periods=1).mean()
-    data['deviation_pct'] = ((data[metric] - data['expected']) / data['expected'] * 100).round(2)
+    # Calculate seasonality-aware expected values
+    # Separate weekend/weekday baselines
+    weekend_mean = data[data['is_weekend']][metric].mean()
+    weekday_mean = data[~data['is_weekend']][metric].mean()
+    data['baseline'] = data['is_weekend'].apply(lambda x: weekend_mean if x else weekday_mean)
+    
+    # Calculate rolling statistics by day type
+    data['rolling_mean'] = data.groupby('is_weekend')[metric].transform(
+        lambda x: x.rolling(window=4, min_periods=2).mean()
+    )
+    data['rolling_std'] = data.groupby('is_weekend')[metric].transform(
+        lambda x: x.rolling(window=4, min_periods=2).std()
+    )
+    
+    # Use rolling mean as expected, fall back to day-type baseline
+    data['expected'] = data['rolling_mean'].fillna(data['baseline'])
+    data['std'] = data['rolling_std'].fillna(data[metric].std())
+    
+    # Calculate z-score for anomaly detection
+    data['z_score'] = (data[metric] - data['expected']) / data['std'].replace(0, 1)
+    data['deviation_pct'] = ((data[metric] - data['expected']) / data['expected'].replace(0, 1) * 100).round(2)
+    
+    # Isolation Forest on residuals (deseasonalized data)
+    residuals = (data[metric] - data['expected']).values.reshape(-1, 1)
+    model = IsolationForest(contamination=contamination, random_state=42)
+    data['if_anomaly'] = model.fit_predict(residuals) == -1
+    
+    # Combined anomaly detection: IF + z-score threshold
+    data['is_anomaly'] = data['if_anomaly'] | (data['z_score'].abs() > 2.5)
     
     # Determine anomaly type
     data['anomaly_type'] = data.apply(
-        lambda x: 'spike' if x[metric] > x['expected'] else 'drop' if x['is_anomaly'] else None, 
+        lambda x: 'spike' if x['is_anomaly'] and x[metric] > x['expected'] 
+                  else 'drop' if x['is_anomaly'] and x[metric] < x['expected']
+                  else None, 
         axis=1
     )
     
-    # Determine severity
-    data['severity'] = data['deviation_pct'].abs().apply(
-        lambda x: 'critical' if x > 50 else 'high' if x > 30 else 'medium' if x > 15 else 'low'
-    )
+    # Determine severity based on z-score and deviation
+    def get_severity(row):
+        z = abs(row['z_score'])
+        dev = abs(row['deviation_pct'])
+        if z > 4 or dev > 50:
+            return 'critical'
+        elif z > 3 or dev > 30:
+            return 'high'
+        elif z > 2 or dev > 15:
+            return 'medium'
+        return 'low'
     
-    return data[data['is_anomaly']]
+    data['severity'] = data.apply(get_severity, axis=1)
+    
+    # Generate business interpretation
+    def get_interpretation(row):
+        if not row['is_anomaly']:
+            return None
+        day_name = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][row['day_of_week']]
+        if row['anomaly_type'] == 'spike':
+            if row['is_weekend']:
+                return f"Unusual weekend spike on {day_name}. Possible promotion effect or special event."
+            return f"Unexpected high {metric.replace('_', ' ')} on {day_name}. Review for campaign impact."
+        else:
+            if row['is_weekend']:
+                return f"Weekend drop on {day_name} below normal patterns. Check for site issues."
+            return f"Weekday underperformance on {day_name}. Investigate operational issues."
+    
+    data['business_interpretation'] = data.apply(get_interpretation, axis=1)
+    
+    # Add recommended action
+    def get_action(row):
+        if not row['is_anomaly']:
+            return None
+        if row['severity'] in ['critical', 'high']:
+            if row['anomaly_type'] == 'drop':
+                return "URGENT: Check website uptime, payment systems, and inventory availability."
+            return "Review: Identify cause of spike for replication or concern."
+        return "Monitor: Track if pattern continues over next few days."
+    
+    data['recommended_action'] = data.apply(get_action, axis=1)
+    
+    result = data[data['is_anomaly']].copy()
+    return result
 
 def save_forecasts_to_db(forecasts: List[dict], metric: str, model_name: str = "Prophet"):
     """Save forecast results to database"""
@@ -151,24 +283,147 @@ def save_forecasts_to_db(forecasts: List[dict], metric: str, model_name: str = "
             })
         conn.commit()
 
-def save_anomalies_to_db(anomalies: List[dict], metric: str):
-    """Save anomaly results to database"""
+def save_anomalies_to_db(anomalies: List[dict], metric: str, run_id: int = None):
+    """Save anomaly results to database with upsert for idempotency"""
     with engine.connect() as conn:
         for a in anomalies:
             conn.execute(text("""
-                INSERT INTO ml_anomalies_daily (anomaly_date, metric_name, actual_value, 
-                                                expected_value, deviation_pct, anomaly_type, severity)
-                VALUES (:date, :metric, :actual, :expected, :deviation, :type, :severity)
+                INSERT INTO ml_anomalies_daily (
+                    anomaly_date, metric_name, actual_value, expected_value, 
+                    deviation_pct, z_score, anomaly_type, severity,
+                    is_weekend, day_of_week, business_interpretation, 
+                    recommended_action, model_run_id
+                )
+                VALUES (
+                    :date, :metric, :actual, :expected, :deviation, :z_score,
+                    :type, :severity, :is_weekend, :dow, :interpretation, 
+                    :action, :run_id
+                )
+                ON CONFLICT (anomaly_date, metric_name) 
+                DO UPDATE SET 
+                    actual_value = :actual,
+                    expected_value = :expected,
+                    deviation_pct = :deviation,
+                    z_score = :z_score,
+                    anomaly_type = :type,
+                    severity = :severity,
+                    business_interpretation = :interpretation,
+                    recommended_action = :action,
+                    model_run_id = :run_id,
+                    updated_at = CURRENT_TIMESTAMP
             """), {
                 "date": a["date"],
                 "metric": metric,
                 "actual": a["actual"],
                 "expected": a["expected"],
-                "deviation": a["deviation_pct"],
+                "deviation": a.get("deviation_pct", 0),
+                "z_score": a.get("z_score", 0),
                 "type": a["anomaly_type"],
-                "severity": a["severity"]
+                "severity": a["severity"],
+                "is_weekend": a.get("is_weekend", False),
+                "dow": a.get("day_of_week", 0),
+                "interpretation": a.get("business_interpretation"),
+                "action": a.get("recommended_action"),
+                "run_id": run_id
             })
         conn.commit()
+
+def save_model_run(model_type: str, metric: str, train_start: str, train_end: str, 
+                   train_samples: int, params: dict, mape: float, smape: float, 
+                   rmse: float, mae: float, baseline_mape: float) -> int:
+    """Record model training run for reproducibility"""
+    improvement = ((baseline_mape - mape) / baseline_mape * 100) if baseline_mape > 0 else 0
+    
+    with engine.connect() as conn:
+        result = conn.execute(text("""
+            INSERT INTO ml_model_runs (
+                model_type, target_metric, train_start_date, train_end_date,
+                train_samples, parameters, mape, smape, rmse, mae,
+                baseline_mape, baseline_rmse, improvement_vs_baseline_pct,
+                model_version, code_version, status
+            ) VALUES (
+                :model_type, :metric, :train_start, :train_end, :samples,
+                :params, :mape, :smape, :rmse, :mae, :baseline_mape, :baseline_rmse,
+                :improvement, :model_version, :code_version, 'completed'
+            )
+            RETURNING run_id
+        """), {
+            "model_type": model_type,
+            "metric": metric,
+            "train_start": train_start,
+            "train_end": train_end,
+            "samples": train_samples,
+            "params": json.dumps(params),
+            "mape": round(mape, 4),
+            "smape": round(smape, 4),
+            "rmse": round(rmse, 4),
+            "mae": round(mae, 4),
+            "baseline_mape": round(baseline_mape, 4),
+            "baseline_rmse": round(rmse, 4),
+            "improvement": round(improvement, 4),
+            "model_version": SERVICE_VERSION,
+            "code_version": CODE_VERSION
+        })
+        run_id = result.fetchone()[0]
+        conn.commit()
+        return run_id
+
+def backtest_model(df: pd.DataFrame, metric: str, test_days: int = 14) -> Dict:
+    """
+    Perform time-series cross-validation backtest.
+    Returns evaluation metrics and comparison vs naive baseline.
+    """
+    if len(df) < test_days + 30:
+        raise ValueError(f"Insufficient data for backtesting. Need at least {test_days + 30} days.")
+    
+    # Split data
+    train_df = df.iloc[:-test_days].copy()
+    test_df = df.iloc[-test_days:].copy()
+    
+    # Train Prophet on training data
+    prophet_train = train_df[['ds', metric]].rename(columns={metric: 'y'})
+    model = Prophet(
+        yearly_seasonality=True,
+        weekly_seasonality=True,
+        daily_seasonality=False,
+        changepoint_prior_scale=0.05
+    )
+    model.fit(prophet_train)
+    
+    # Predict on test period
+    future = model.make_future_dataframe(periods=test_days)
+    forecast = model.predict(future)
+    predictions = forecast.iloc[-test_days:]['yhat'].values
+    
+    # Get actuals
+    actuals = test_df[metric].values
+    
+    # Calculate naive baseline (last week = this week)
+    baseline_preds = naive_baseline_forecast(train_df[metric], test_days)
+    
+    # Calculate metrics
+    mape = calculate_mape(actuals, predictions)
+    smape = calculate_smape(actuals, predictions)
+    rmse = calculate_rmse(actuals, predictions)
+    mae = calculate_mae(actuals, predictions)
+    baseline_mape = calculate_mape(actuals, baseline_preds)
+    
+    improvement = ((baseline_mape - mape) / baseline_mape * 100) if baseline_mape > 0 else 0
+    
+    return {
+        "metric": metric,
+        "mape": round(mape, 2),
+        "smape": round(smape, 2),
+        "rmse": round(rmse, 2),
+        "mae": round(mae, 2),
+        "baseline_mape": round(baseline_mape, 2),
+        "improvement_pct": round(improvement, 2),
+        "test_samples": test_days,
+        "train_start": str(train_df['ds'].min().date()),
+        "train_end": str(train_df['ds'].max().date()),
+        "predictions": predictions.tolist(),
+        "actuals": actuals.tolist()
+    }
 
 def generate_report(forecasts: dict, anomalies: dict, report_path: str):
     """Generate markdown report for anomalies and forecasts"""
@@ -459,13 +714,123 @@ async def get_latest_anomalies():
     try:
         query = """
             SELECT anomaly_date, metric_name, actual_value, expected_value,
-                   deviation_pct, anomaly_type, severity, created_at
+                   deviation_pct, anomaly_type, severity, 
+                   business_interpretation, recommended_action,
+                   is_weekend, acknowledged, created_at
             FROM ml_anomalies_daily
-            ORDER BY anomaly_date DESC, severity DESC
+            ORDER BY anomaly_date DESC, 
+                     CASE severity WHEN 'critical' THEN 1 WHEN 'high' THEN 2 
+                          WHEN 'medium' THEN 3 ELSE 4 END
             LIMIT 50
         """
         df = pd.read_sql(query, engine)
         return df.to_dict('records')
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/anomalies/active", response_model=List[dict])
+async def get_active_alerts():
+    """Get unacknowledged anomalies requiring attention"""
+    try:
+        query = """
+            SELECT anomaly_date, metric_name, actual_value, expected_value,
+                   deviation_pct, anomaly_type, severity,
+                   business_interpretation, recommended_action
+            FROM ml_anomalies_daily
+            WHERE NOT acknowledged
+              AND anomaly_date >= CURRENT_DATE - INTERVAL '7 days'
+            ORDER BY CASE severity WHEN 'critical' THEN 1 WHEN 'high' THEN 2 
+                          WHEN 'medium' THEN 3 ELSE 4 END,
+                     anomaly_date DESC
+        """
+        df = pd.read_sql(query, engine)
+        return df.to_dict('records')
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/backtest/{metric}", response_model=BacktestResult)
+async def run_backtest(metric: str, test_days: int = 14):
+    """Run backtest for a specific metric and return evaluation metrics"""
+    valid_metrics = ["total_revenue", "total_orders"]
+    
+    if metric not in valid_metrics:
+        raise HTTPException(status_code=400, detail=f"Invalid metric. Choose from: {valid_metrics}")
+    
+    try:
+        df = get_daily_kpis()
+        
+        if len(df) < test_days + 30:
+            raise HTTPException(status_code=400, 
+                detail=f"Insufficient data. Need at least {test_days + 30} days, have {len(df)}.")
+        
+        result = backtest_model(df, metric, test_days)
+        
+        return BacktestResult(
+            metric=result["metric"],
+            mape=result["mape"],
+            smape=result["smape"],
+            rmse=result["rmse"],
+            mae=result["mae"],
+            baseline_mape=result["baseline_mape"],
+            improvement_pct=result["improvement_pct"],
+            test_samples=result["test_samples"]
+        )
+        
+    except Exception as e:
+        logger.error(f"Backtest error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/model-runs", response_model=List[dict])
+async def get_model_runs(limit: int = 20):
+    """Get recent model training runs"""
+    try:
+        query = f"""
+            SELECT run_id, model_type, target_metric, train_start_date, train_end_date,
+                   train_samples, mape, smape, baseline_mape, improvement_vs_baseline_pct,
+                   model_version, code_version, run_timestamp, status
+            FROM ml_model_runs
+            ORDER BY run_timestamp DESC
+            LIMIT {limit}
+        """
+        df = pd.read_sql(query, engine)
+        return df.to_dict('records')
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/dashboard/freshness", response_model=List[dict])
+async def get_data_freshness():
+    """Get data freshness status for all tables (for dashboard 'last updated' display)"""
+    try:
+        query = """
+            SELECT table_name, last_refresh_at, row_count,
+                   EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - last_refresh_at))/3600 as hours_since_refresh,
+                   CASE 
+                       WHEN last_refresh_at > CURRENT_TIMESTAMP - INTERVAL '6 hours' THEN 'fresh'
+                       WHEN last_refresh_at > CURRENT_TIMESTAMP - INTERVAL '24 hours' THEN 'stale'
+                       ELSE 'outdated'
+                   END as freshness_status
+            FROM table_refresh_log
+            ORDER BY last_refresh_at DESC
+        """
+        df = pd.read_sql(query, engine)
+        return df.to_dict('records')
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/acknowledge/{anomaly_date}/{metric}")
+async def acknowledge_anomaly(anomaly_date: str, metric: str, acknowledged_by: str = "analyst"):
+    """Mark an anomaly as acknowledged"""
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("""
+                UPDATE ml_anomalies_daily 
+                SET acknowledged = TRUE, 
+                    acknowledged_by = :user,
+                    acknowledged_at = CURRENT_TIMESTAMP
+                WHERE anomaly_date = :date AND metric_name = :metric
+            """), {"date": anomaly_date, "metric": metric, "user": acknowledged_by})
+            conn.commit()
+        return {"status": "acknowledged", "date": anomaly_date, "metric": metric}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

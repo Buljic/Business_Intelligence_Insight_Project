@@ -2,9 +2,26 @@
 -- SUPERSET DASHBOARD QUERIES
 -- Use these queries to create charts in Superset
 -- ============================================
+-- 
+-- DASHBOARD DESIGN PRINCIPLES:
+-- 1. Each dashboard answers a specific business question
+-- 2. Flow: What happened? → Why? → What's next?
+-- 3. Every chart has a clear purpose and title
+-- 4. Consistent KPI definitions across all views
+-- 5. Filters: Date range, Country, Segment, Top N products
+--
+-- RECOMMENDED FILTERS FOR ALL DASHBOARDS:
+-- - Date Range: full_date BETWEEN :start_date AND :end_date
+-- - Country: country_name IN (:selected_countries)
+-- - Customer Segment: rfm_segment IN (:selected_segments)
+--
+-- ============================================
 
 -- ============================================
--- EXECUTIVE OVERVIEW DASHBOARD
+-- DASHBOARD 1: EXECUTIVE OVERVIEW
+-- Purpose: Answer "How is the business performing?"
+-- Audience: C-suite, Management
+-- Key Questions: Are we growing? What are our key metrics?
 -- ============================================
 
 -- 1. Total Revenue Over Time (Line Chart)
@@ -158,9 +175,20 @@ GROUP BY dd.full_date, dp.stock_code
 ORDER BY dd.full_date, "Revenue" DESC;
 
 -- ============================================
--- AI/ML DASHBOARD
+-- DASHBOARD 4: AI/ML INSIGHTS - "DEMAND OUTLOOK & ALERTS"
+-- Purpose: Answer "What's next? What needs attention?"
+-- Audience: Operations, Planning, Management
+-- Key Questions: What's the 7-day demand forecast? Are there anomalies?
+-- 
+-- This is NOT a "random model output" page - it's a DECISION TOOL:
+-- - "Next 7 Days Demand Outlook" with confidence bands
+-- - "Alerts Requiring Attention" with business interpretation
+-- - "Model Performance" to build trust in predictions
 -- ============================================
 
+-- SECTION: "7-DAY DEMAND OUTLOOK"
+-- Chart Title: "Revenue Forecast - Next 7 Days"
+-- Chart Description: "Prophet model forecast with 95% confidence interval. Use for inventory planning and staffing."
 -- 1. Revenue Forecast vs Actual (Line Chart)
 SELECT 
     COALESCE(mk.full_date, mf.forecast_date) as "Date",
@@ -258,3 +286,131 @@ SELECT
           NULLIF(LAG(weekly_revenue) OVER (ORDER BY week_start), 0) * 100, 2) as "WoW Growth %"
 FROM weekly_data
 ORDER BY week_start;
+
+-- ============================================
+-- ENHANCED AI/ML QUERIES FOR DECISION-MAKING
+-- ============================================
+
+-- SECTION: "ALERTS REQUIRING ATTENTION"
+-- Chart Title: "Business Anomalies - Action Required"
+-- Chart Description: "Unusual patterns detected by ML. Review and acknowledge to clear alerts."
+
+-- Active Alerts Table (shows unacknowledged anomalies with business context)
+SELECT 
+    anomaly_date as "Date",
+    metric_name as "Metric",
+    ROUND(actual_value, 0) as "Actual",
+    ROUND(expected_value, 0) as "Expected",
+    ROUND(deviation_pct, 1) || '%' as "Deviation",
+    UPPER(anomaly_type) as "Type",
+    UPPER(severity) as "Severity",
+    COALESCE(business_interpretation, 'Requires investigation') as "What Happened",
+    COALESCE(recommended_action, 'Review and acknowledge') as "Recommended Action"
+FROM ml_anomalies_daily
+WHERE NOT COALESCE(acknowledged, FALSE)
+  AND anomaly_date >= CURRENT_DATE - INTERVAL '14 days'
+ORDER BY 
+    CASE severity WHEN 'critical' THEN 1 WHEN 'high' THEN 2 WHEN 'medium' THEN 3 ELSE 4 END,
+    anomaly_date DESC;
+
+-- SECTION: "MODEL PERFORMANCE"
+-- Chart Title: "Forecast Accuracy - Can You Trust These Predictions?"
+-- Chart Description: "Model evaluation metrics vs naive baseline. Lower MAPE = better accuracy."
+
+-- Model Performance Summary (for trust-building)
+SELECT 
+    target_metric as "Metric",
+    ROUND(mape, 1) || '%' as "Model MAPE",
+    ROUND(baseline_mape, 1) || '%' as "Baseline MAPE",
+    ROUND(improvement_vs_baseline_pct, 1) || '%' as "Improvement",
+    train_samples || ' days' as "Training Data",
+    TO_CHAR(run_timestamp, 'YYYY-MM-DD HH24:MI') as "Last Trained"
+FROM ml_model_runs
+WHERE status = 'completed'
+ORDER BY run_timestamp DESC
+LIMIT 4;
+
+-- SECTION: "7-DAY OUTLOOK SUMMARY"
+-- Chart Title: "Next Week Demand Summary"
+-- Use as KPI cards
+
+-- Next 7 Days Total Revenue Forecast
+SELECT 
+    ROUND(SUM(predicted_value), 0) as "Forecasted Revenue",
+    ROUND(SUM(lower_bound), 0) as "Conservative Estimate",
+    ROUND(SUM(upper_bound), 0) as "Optimistic Estimate"
+FROM ml_forecast_daily
+WHERE metric_name = 'revenue'
+  AND forecast_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '6 days';
+
+-- Next 7 Days Total Orders Forecast  
+SELECT 
+    ROUND(SUM(predicted_value), 0) as "Forecasted Orders",
+    ROUND(SUM(lower_bound), 0) as "Conservative Estimate",
+    ROUND(SUM(upper_bound), 0) as "Optimistic Estimate"
+FROM ml_forecast_daily
+WHERE metric_name = 'orders'
+  AND forecast_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '6 days';
+
+-- ============================================
+-- DATA FRESHNESS INDICATOR
+-- Show on every dashboard footer
+-- ============================================
+
+-- Data Freshness Status (for dashboard "Last Updated" display)
+SELECT 
+    table_name as "Data Source",
+    TO_CHAR(last_refresh_at, 'YYYY-MM-DD HH24:MI') as "Last Updated",
+    row_count as "Records",
+    CASE 
+        WHEN last_refresh_at > CURRENT_TIMESTAMP - INTERVAL '6 hours' THEN '🟢 Fresh'
+        WHEN last_refresh_at > CURRENT_TIMESTAMP - INTERVAL '24 hours' THEN '🟡 Stale'
+        ELSE '🔴 Outdated'
+    END as "Status"
+FROM table_refresh_log
+WHERE table_name IN ('mart_daily_kpis', 'mart_rfm', 'ml_forecast_daily')
+ORDER BY last_refresh_at DESC;
+
+-- ============================================
+-- ACTIONABLE INSIGHTS QUERIES
+-- ============================================
+
+-- High-Value Customers At Risk (Action: Re-engagement campaign)
+SELECT 
+    customer_id as "Customer ID",
+    ROUND(monetary, 2) as "Lifetime Value",
+    recency_days as "Days Since Purchase",
+    rfm_segment as "Current Segment",
+    'Send re-engagement offer' as "Recommended Action"
+FROM mart_rfm
+WHERE rfm_segment IN ('At Risk', 'Cant Lose Them')
+  AND monetary > (SELECT AVG(monetary) * 2 FROM mart_rfm)
+ORDER BY monetary DESC
+LIMIT 20;
+
+-- Top Growing Countries (Action: Increase marketing spend)
+SELECT 
+    country_name as "Country",
+    ROUND(total_revenue, 0) as "Revenue",
+    total_orders as "Orders",
+    total_customers as "Customers",
+    ROUND(avg_order_value, 2) as "AOV",
+    'Consider market expansion' as "Opportunity"
+FROM mart_country_performance
+WHERE total_customers > 10
+ORDER BY total_revenue DESC
+LIMIT 10;
+
+-- Products Needing Attention (Low performance but high potential)
+SELECT 
+    stock_code as "SKU",
+    LEFT(description, 40) as "Product",
+    total_orders as "Orders",
+    ROUND(total_revenue, 0) as "Revenue",
+    ROUND(avg_unit_price, 2) as "Avg Price",
+    'Review pricing/promotion' as "Action"
+FROM mart_product_performance
+WHERE revenue_rank BETWEEN 50 AND 200
+  AND total_orders > 10
+ORDER BY total_revenue DESC
+LIMIT 15;
