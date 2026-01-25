@@ -1,0 +1,254 @@
+{
+  "name": "Workflow A - CSV Data Ingestion",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "2a72a38d-f167-4a34-94c2-332e7d791296",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        16,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "fileSelector": ".csv"
+      },
+      "id": "4bf10887-9fd8-4cef-84c5-2d65e4f25797",
+      "name": "Read CSV File",
+      "type": "n8n-nodes-base.readBinaryFiles",
+      "typeVersion": 1,
+      "position": [
+        -1248,
+        400
+      ],
+      "alwaysOutputData": true,
+      "notes": "Reads the e-commerce data CSV file"
+    },
+    {
+      "parameters": {
+        "options": {
+          "rawData": true
+        }
+      },
+      "id": "710a44cc-e61d-4eac-ac78-8987bfa1d6aa",
+      "name": "CSV to JSON",
+      "type": "n8n-nodes-base.spreadsheetFile",
+      "typeVersion": 1,
+      "position": [
+        416,
+        240
+      ],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "batchSize": 1000,
+        "options": {}
+      },
+      "id": "2b82ed87-6016-47ac-b9ae-14bd530c4e92",
+      "name": "Split Into Batches",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        816,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "schema": {
+          "__rl": true,
+          "value": "public",
+          "mode": "list",
+          "cachedResultName": "public"
+        },
+        "table": {
+          "__rl": true,
+          "value": "raw_transactions",
+          "mode": "list",
+          "cachedResultName": "raw_transactions"
+        },
+        "options": {}
+      },
+      "id": "160f44f6-4423-4eae-a21d-63486d313c14",
+      "name": "Insert to PostgreSQL",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        240
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "ziZhCz8jq0LmfN7F",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Workflow A: CSV Data Ingestion\n\n**Purpose:** Load raw e-commerce data from CSV into PostgreSQL\n\n**Steps:**\n1. Read CSV file from /data/data.csv\n2. Convert to JSON format\n3. Split into batches of 1000 records\n4. Insert into raw_transactions table\n\n**Credentials Required:**\n- PostgreSQL connection to ecommerce_dw database",
+        "height": 280,
+        "width": 320
+      },
+      "id": "d1c28cb4-2622-400c-9a81-8edd1608e04c",
+      "name": "Sticky Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -448,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -1232,
+        272
+      ],
+      "id": "a42c3f1c-4467-4340-bb55-3e965e4a73f9",
+      "name": "Extract from File",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "fileSelector": "/home/node/.n8n-files/data.csv",
+        "options": {
+          "fileExtension": ".csv",
+          "fileName": "data.csv"
+        }
+      },
+      "type": "n8n-nodes-base.readWriteFile",
+      "typeVersion": 1.1,
+      "position": [
+        256,
+        240
+      ],
+      "id": "54c32cdf-34fd-4b0e-baef-61306817ffcc",
+      "name": "Read/Write Files from Disk",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "jsCode": "function stripEq(v) {\n  if (v === null || v === undefined) return null;\n  let s = String(v).trim();\n  if (s.startsWith('=')) s = s.slice(1).trim();\n  if (s === '' || s.toLowerCase() === 'nan') return null;\n  return s;\n}\n\nfunction toInt(v) {\n  const s = stripEq(v);\n  if (s === null) return null;\n  const n = Number(s);\n  return Number.isFinite(n) ? Math.trunc(n) : null;\n}\n\nfunction toFloat(v) {\n  const s = stripEq(v);\n  if (s === null) return null;\n  const n = Number(s);\n  return Number.isFinite(n) ? n : null;\n}\n\n// If Postgres later complains about date parsing, tell me the exact error and we’ll adjust.\nfunction normalizeDate(v) {\n  const s = stripEq(v);\n  return s; // keep as-is for now\n}\n\nreturn items.map((item) => {\n  const j = item.json || {};\n  return {\n    json: {\n      invoice_no:  stripEq(j.InvoiceNo),\n      stock_code:  stripEq(j.StockCode),\n      description: j.Description ?? '',\n      quantity:    toInt(j.Quantity),\n      invoice_date: normalizeDate(j.InvoiceDate),\n      unit_price:  toFloat(j.UnitPrice),\n      customer_id: toInt(j.CustomerID),\n      country:     j.Country ?? '',\n    }\n  };\n});\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        256
+      ],
+      "id": "928bed1e-048e-4a5a-9ec3-c7e3995ea7aa",
+      "name": "Code in JavaScript",
+      "alwaysOutputData": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Read/Write Files from Disk",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read CSV File": {
+      "main": [
+        []
+      ]
+    },
+    "CSV to JSON": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Into Batches": {
+      "main": [
+        [
+          {
+            "node": "Insert to PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Insert to PostgreSQL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        []
+      ]
+    },
+    "Read/Write Files from Disk": {
+      "main": [
+        [
+          {
+            "node": "CSV to JSON",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Split Into Batches",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "31cf27eb-323a-4934-8b86-35b024e0abe4",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "fa1210e092a8afe2b16ed7dbc7910bc3b261746d0e5b9f5e1b7b01db0b121df9"
+  },
+  "id": "B9HxQ5hcgdOEOrfcPNKDL",
+  "tags": [
+    {
+      "updatedAt": "2026-01-25T09:24:41.284Z",
+      "createdAt": "2026-01-25T09:24:41.284Z",
+      "id": "s2KoXTCIo3rsLlhO",
+      "name": "Ingestion"
+    },
+    {
+      "updatedAt": "2026-01-25T09:24:41.315Z",
+      "createdAt": "2026-01-25T09:24:41.315Z",
+      "id": "YADfZ77GxPmEV61E",
+      "name": "ETL"
+    }
+  ]
+}

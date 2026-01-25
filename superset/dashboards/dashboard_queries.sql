@@ -473,6 +473,19 @@ WHERE status = 'completed'
 ORDER BY run_timestamp DESC
 LIMIT 4;
 
+-- Model Comparison (Average Performance)
+SELECT 
+    target_metric as "Metric",
+    model_type as "Model",
+    ROUND(AVG(mape), 2) as "Avg MAPE",
+    ROUND(AVG(baseline_mape), 2) as "Avg Baseline MAPE",
+    ROUND(AVG(improvement_vs_baseline_pct), 2) as "Avg Improvement %"
+FROM ml_model_runs
+WHERE status = 'completed'
+  AND model_type LIKE 'forecast_%'
+GROUP BY target_metric, model_type
+ORDER BY target_metric, "Avg MAPE";
+
 -- SECTION: "7-DAY OUTLOOK SUMMARY"
 -- Chart Title: "Next Week Demand Summary"
 -- Use as KPI cards

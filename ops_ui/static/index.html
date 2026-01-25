@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BI Control Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>BI Control Center</h1>
+    <p class="subtitle">
+      Trigger the full pipeline, run model checks, and preview results without touching curl.
+      Use this panel as a demo-friendly cockpit for your end-to-end BI stack.
+    </p>
+    <div class="status-row">
+      <div class="status-chip" id="status-db">database: ...</div>
+      <div class="status-chip" id="status-ml">ml: ...</div>
+    </div>
+  </header>
+
+  <section class="grid">
+    <div class="card">
+      <h3>Data Load</h3>
+      <p>Import the CSV into Postgres. Optionally trigger ETL and ML right after.</p>
+      <div style="display: grid; gap: 8px; margin-bottom: 12px;">
+        <label class="toggle"><input type="checkbox" id="import-run-etl" checked />Run ETL after import</label>
+        <label class="toggle"><input type="checkbox" id="import-run-ml" />Train ML after import</label>
+      </div>
+      <div class="controls">
+        <button id="btn-import">Import CSV</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Pipeline Actions</h3>
+      <p>Run the ETL or data quality checks from a single place.</p>
+      <div class="controls">
+        <button id="btn-etl">Run Full ETL</button>
+        <button class="secondary" id="btn-dq">Run DQ Checks</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>ML Actions</h3>
+      <p>Train models or run a quick backtest to compare options.</p>
+      <div class="controls">
+        <button id="btn-ml">Train Models</button>
+      </div>
+      <div style="margin-top: 12px; display: grid; gap: 8px;">
+        <label for="backtest-metric">Backtest metric</label>
+        <select id="backtest-metric">
+          <option value="total_revenue">total_revenue</option>
+          <option value="total_orders">total_orders</option>
+        </select>
+        <label for="backtest-model">Model</label>
+        <select id="backtest-model">
+          <option value="auto">auto</option>
+          <option value="prophet">prophet</option>
+          <option value="ets">ets</option>
+        </select>
+        <label for="backtest-days">Test days</label>
+        <input id="backtest-days" type="number" value="14" min="7" max="60" />
+        <button class="secondary" id="btn-backtest">Run Backtest</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Business Queries</h3>
+      <p>Load curated results for quick inspection and demos.</p>
+      <div class="controls">
+        <button data-query="executive_summary">Executive Summary</button>
+        <button data-query="country_top10">Top Countries</button>
+        <button data-query="rfm_segments">RFM Segments</button>
+        <button data-query="forecast_next_7d">Forecast 7D</button>
+        <button data-query="latest_anomalies">Latest Anomalies</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>ML Outputs</h3>
+      <p>Fetch the latest forecasts and anomalies from the ML service.</p>
+      <div class="controls">
+        <button id="btn-forecasts">Latest Forecasts</button>
+        <button class="secondary" id="btn-anomalies">Latest Anomalies</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Data Freshness</h3>
+      <p>Confirm marts and ML outputs are recently refreshed.</p>
+      <div class="controls">
+        <button data-query="data_freshness">Check Freshness</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Superset Setup</h3>
+      <p>Create the Superset database connection and register datasets.</p>
+      <div class="controls">
+        <button id="btn-superset">Setup Superset</button>
+      </div>
+    </div>
+  </section>
+
+  <section class="output">
+    <div class="output-card">
+      <h3>Output</h3>
+      <pre id="output-pre">Select an action to view results.</pre>
+    </div>
+    <div class="output-card">
+      <h3>Preview Table</h3>
+      <div id="output-table"></div>
+    </div>
+  </section>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

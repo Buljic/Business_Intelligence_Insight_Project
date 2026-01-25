@@ -10,6 +10,7 @@ SQLALCHEMY_DATABASE_URI = 'sqlite:////app/superset_home/superset.db'
 # Flask settings
 ENABLE_PROXY_FIX = True
 PREFERRED_URL_SCHEME = 'http'
+WTF_CSRF_ENABLED = False
 
 # Feature flags
 FEATURE_FLAGS = {

@@ -23,6 +23,26 @@ services:
       timeout: 5s
       retries: 5
 
+  ingester:
+    image: python:3.11-slim
+    working_dir: /app
+    volumes:
+      - ./scripts:/app
+      - ./data:/home/node/.n8n-files
+    environment:
+      CSV_PATH: /home/node/.n8n-files/data.csv
+      PGHOST: postgres
+      PGPORT: 5432
+      PGDATABASE: ecommerce_dw
+      PGUSER: postgres
+      PGPASSWORD: postgres123
+      BATCH_SIZE: 2000
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["python", "/app/ingest_csv.py"]
+    profiles: ["tools"]
+
   # n8n - ETL/Orchestration
   n8n:
     image: n8nio/n8n:latest
@@ -31,6 +51,7 @@ services:
       - N8N_BASIC_AUTH_ACTIVE=true
       - N8N_BASIC_AUTH_USER=admin
       - N8N_BASIC_AUTH_PASSWORD=admin123
+      - N8N_USER_MANAGEMENT_DISABLED=true
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=postgres
       - DB_POSTGRESDB_PORT=5432
@@ -48,6 +69,7 @@ services:
       - n8n_data:/home/node/.n8n
       - ./data:/data
       - ./n8n/workflows:/workflows
+      - ./data:/home/node/.n8n-files
     networks:
       - ecommerce_network
     depends_on:
@@ -103,6 +125,7 @@ services:
   superset:
     image: apache/superset:latest
     container_name: ecommerce_superset
+    user: root
     environment:
       - SUPERSET_SECRET_KEY=your_secret_key_here_change_in_production
       - ADMIN_USERNAME=admin
@@ -120,11 +143,38 @@ services:
         condition: service_healthy
     command: >
       bash -c "
+        /app/.venv/bin/python -m ensurepip --upgrade &&
+        /app/.venv/bin/python -m pip install --no-cache-dir psycopg2-binary &&
         superset db upgrade &&
         superset fab create-admin --username admin --firstname Admin --lastname User --email admin@example.com --password admin123 || true &&
         superset init &&
         superset run -h 0.0.0.0 -p 8088 --with-threads --reload
       "
+
+  # BI Control Center UI
+  ops_ui:
+    build:
+      context: ./ops_ui
+      dockerfile: Dockerfile
+    container_name: ecommerce_ops_ui
+    environment:
+      - DATABASE_URL=postgresql://postgres:postgres123@postgres:5432/ecommerce_dw
+      - ML_SERVICE_URL=http://ml_service:8000
+      - SUPERSET_URL=http://superset:8088
+      - SUPERSET_USERNAME=admin
+      - SUPERSET_PASSWORD=admin123
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./ops_ui:/app
+      - ./data:/data
+      - ./data.csv:/data/source.csv:ro
+    networks:
+      - ecommerce_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+        
 
 volumes:
   postgres_data:

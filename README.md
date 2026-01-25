@@ -72,8 +72,13 @@ docker-compose ps
 |---------|-----|-------------|
 | **n8n** (ETL) | http://localhost:5678 | admin / admin123 |
 | **Superset** (BI) | http://localhost:8088 | admin / admin123 |
+| **BI Control Center** | http://localhost:8090 | - |
 | **ML API** | http://localhost:8000 | - |
 | **PostgreSQL** | localhost:5432 | postgres / postgres123 |
+
+**n8n login note:** User management is disabled for simplicity; log in with the basic auth credentials above. If you already created an n8n account with different credentials, clear the volume and restart: `docker-compose down -v` then `docker-compose up -d`.
+
+**Superset note:** You won't see datasets or charts until you run ETL and execute `python scripts/setup_superset.py`.
 
 ## 📊 Data Pipeline
 
@@ -121,6 +126,19 @@ CSV → Streamer → raw_transactions → run_full_etl() → Dashboards/ML
 3. Configure PostgreSQL credentials
 4. Execute the workflow
 
+**Alternative (No n8n): Direct CSV Load**
+
+If the UI is unavailable, you can load the CSV directly into Postgres:
+
+```bash
+# Copy CSV into the mounted data folder
+copy data.csv data\data.csv
+
+# Load into raw_transactions (handles GBP symbols via LATIN1 encoding)
+docker exec -i ecommerce_postgres psql -U postgres -d ecommerce_dw -c "TRUNCATE TABLE raw_transactions;"
+docker exec -i ecommerce_postgres psql -U postgres -d ecommerce_dw -c "SET datestyle TO 'ISO, MDY'; COPY raw_transactions (invoice_no, stock_code, description, quantity, invoice_date, unit_price, customer_id, country) FROM '/data/data.csv' WITH (FORMAT csv, HEADER true, ENCODING 'LATIN1');"
+```
+
 ### Step 2: Run ETL Transforms (Workflow B)
 
 1. Import `n8n/workflows/workflow_b_etl_transforms.json`
@@ -131,12 +149,31 @@ CSV → Streamer → raw_transactions → run_full_etl() → Dashboards/ML
 1. Import `n8n/workflows/workflow_c_ml_pipeline.json`
 2. Execute to generate forecasts and detect anomalies
 
+### UI-First Walkthrough (No curl needed)
+
+After `docker-compose up -d --build`, you can complete the entire flow with the **BI Control Center** UI.
+
+1. **BI Control Center**: Open http://localhost:8090
+2. Click **Import CSV** (keep "Run ETL after import" checked; optionally enable "Train ML after import").
+3. Click **Setup Superset** to register the database and datasets.
+4. Open **Superset** at http://localhost:8088 and build charts using `superset/dashboards/dashboard_queries.sql`.
+
+Optional tools:
+- **n8n UI** (ETL): http://localhost:5678 if you want workflow orchestration.
+- **ML UI** (Swagger): http://localhost:8000/docs for API exploration.
+
 **Alternative: Direct SQL**
 
 ```sql
 -- Run full ETL pipeline
 SELECT * FROM run_full_etl();
 ```
+
+### Suggested Run Frequency
+
+- **One-time demo:** Run Workflow A → B → C once, then build dashboards.
+- **Daily refresh:** Run Workflow B + C once per day (or on a cron schedule in n8n).
+- **Near real-time:** Start the streaming service to micro-batch data and auto-refresh marts.
 
 ## Streaming / Micro-Batch Mode (Optional)
 
@@ -258,6 +295,11 @@ curl -X POST "http://localhost:8000/backtest/total_revenue?model=ets&test_days=1
 │   ├── Dockerfile              # Streaming micro-batch service
 │   ├── streamer.py             # CSV streamer + ETL trigger
 │   └── etl_runner.py           # One-off ETL runner with logging
+│
+├── ops_ui/
+│   ├── Dockerfile              # BI Control Center UI service
+│   ├── main.py                 # API + HTML for one-click operations
+│   └── static/                 # UI assets (HTML/CSS/JS)
 │
 ├── reports/                    # ML-generated reports
 │

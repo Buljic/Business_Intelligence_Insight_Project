@@ -13,7 +13,7 @@ SUPERSET_URL = "http://localhost:8088"
 USERNAME = "admin"
 PASSWORD = "admin123"
 
-def get_access_token():
+def get_access_token(session: requests.Session):
     """Get JWT access token from Superset"""
     login_url = f"{SUPERSET_URL}/api/v1/security/login"
     payload = {
@@ -22,22 +22,22 @@ def get_access_token():
         "provider": "db",
         "refresh": True
     }
-    response = requests.post(login_url, json=payload)
+    response = session.post(login_url, json=payload)
     if response.status_code == 200:
         return response.json()["access_token"]
     else:
         print(f"Login failed: {response.text}")
         return None
 
-def get_csrf_token(headers):
+def get_csrf_token(session: requests.Session):
     """Get CSRF token"""
     csrf_url = f"{SUPERSET_URL}/api/v1/security/csrf_token/"
-    response = requests.get(csrf_url, headers=headers)
+    response = session.get(csrf_url)
     if response.status_code == 200:
         return response.json()["result"]
     return None
 
-def create_database_connection(headers):
+def create_database_connection(session: requests.Session):
     """Create PostgreSQL database connection"""
     db_url = f"{SUPERSET_URL}/api/v1/database/"
     
@@ -58,24 +58,24 @@ def create_database_connection(headers):
         })
     }
     
-    response = requests.post(db_url, headers=headers, json=payload)
+    response = session.post(db_url, json=payload)
     if response.status_code in [200, 201]:
         db_id = response.json()["id"]
-        print(f"✓ Database connection created (ID: {db_id})")
+        print(f"[OK] Database connection created (ID: {db_id})")
         return db_id
     else:
         print(f"Database creation failed: {response.text}")
         # Try to get existing database
-        response = requests.get(db_url, headers=headers)
+        response = session.get(db_url)
         if response.status_code == 200:
             databases = response.json().get("result", [])
             for db in databases:
                 if "ecommerce" in db.get("database_name", "").lower():
-                    print(f"✓ Found existing database (ID: {db['id']})")
+                    print(f"[OK] Found existing database (ID: {db['id']})")
                     return db["id"]
         return None
 
-def create_dataset(headers, db_id, table_name, schema="public"):
+def create_dataset(session: requests.Session, db_id, table_name, schema="public"):
     """Create a dataset from a table"""
     dataset_url = f"{SUPERSET_URL}/api/v1/dataset/"
     
@@ -85,9 +85,9 @@ def create_dataset(headers, db_id, table_name, schema="public"):
         "table_name": table_name
     }
     
-    response = requests.post(dataset_url, headers=headers, json=payload)
+    response = session.post(dataset_url, json=payload)
     if response.status_code in [200, 201]:
-        print(f"✓ Dataset created: {table_name}")
+        print(f"[OK] Dataset created: {table_name}")
         return response.json()["id"]
     else:
         print(f"  Dataset {table_name} may already exist: {response.status_code}")
@@ -105,7 +105,7 @@ def main():
         try:
             response = requests.get(f"{SUPERSET_URL}/health")
             if response.status_code == 200:
-                print("✓ Superset is ready")
+                print("[OK] Superset is ready")
                 break
         except:
             pass
@@ -114,25 +114,27 @@ def main():
     
     # Get access token
     print("\nAuthenticating...")
-    token = get_access_token()
+    session = requests.Session()
+    token = get_access_token(session)
     if not token:
         print("Failed to authenticate. Make sure Superset is running.")
         return
-    print("✓ Authenticated")
-    
-    headers = {
+    print("[OK] Authenticated")
+
+    session.headers.update({
         "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json"
-    }
-    
+        "Content-Type": "application/json",
+        "Referer": SUPERSET_URL
+    })
+
     # Get CSRF token
-    csrf_token = get_csrf_token(headers)
+    csrf_token = get_csrf_token(session)
     if csrf_token:
-        headers["X-CSRFToken"] = csrf_token
+        session.headers["X-CSRFToken"] = csrf_token
     
     # Create database connection
     print("\nCreating database connection...")
-    db_id = create_database_connection(headers)
+    db_id = create_database_connection(session)
     if not db_id:
         print("Failed to create database connection")
         return
@@ -157,7 +159,7 @@ def main():
     ]
     
     for table in tables:
-        create_dataset(headers, db_id, table)
+        create_dataset(session, db_id, table)
     
     print("\n" + "=" * 50)
     print("Setup Complete!")
