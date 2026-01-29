@@ -97,6 +97,7 @@ h1 {
   background: linear-gradient(120deg, rgba(55, 214, 194, 0.12), transparent 60%);
   opacity: 0;
   transition: opacity 0.3s ease;
+  pointer-events: none;
 }
 
 .card:hover::after {

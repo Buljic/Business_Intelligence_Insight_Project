@@ -14,8 +14,8 @@
         "rule": {
           "interval": [
             {
-              "field": "hours",
-              "hoursInterval": 24
+              "field": "days",
+              "daysInterval": 7
             }
           ]
         }
@@ -116,7 +116,7 @@
     },
     {
       "parameters": {
-        "content": "## Workflow C: ML Pipeline\n\n**Purpose:** Run ML forecasting and anomaly detection\n\n**Steps:**\n1. Check ML service health\n2. Train models (Prophet for forecasting)\n3. Generate 7-day forecasts for revenue & orders\n4. Detect anomalies using Isolation Forest\n5. Save results to database\n6. Generate alert report if anomalies found\n\n**Schedule:** Daily\n\n**ML Service Endpoints:**\n- POST /train - Train all models\n- POST /forecast - Generate forecasts\n- POST /anomalies - Detect anomalies",
+        "content": "## Workflow C: ML Pipeline\n\n**Purpose:** Run ML forecasting and anomaly detection\n\n**Steps:**\n1. Check ML service health\n2. Train models (Prophet/ETS for forecasting)\n3. Generate 14-day forecasts and 365-day strategic outlook\n4. Detect anomalies using Isolation Forest\n5. Save results to database\n6. Generate alert report if anomalies found\n\n**Schedule:** Weekly\n\n**ML Service Endpoints:**\n- POST /train - Train all models\n- POST /forecast - Generate forecasts\n- POST /anomalies - Detect anomalies",
         "height": 380,
         "width": 380
       },

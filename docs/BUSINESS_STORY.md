@@ -23,7 +23,8 @@ This Business Intelligence platform transforms raw e-commerce transaction data i
 | 1 | **Sales Health Monitoring** | Real-time visibility into revenue/orders | Dashboard loads <3 sec, data <6 hours old |
 | 2 | **Customer Value Understanding** | RFM segmentation with actionable segments | 100% of customers scored and categorized |
 | 3 | **Geographic Intelligence** | Country-level performance analysis | All countries ranked by revenue contribution |
-| 4 | **Demand Forecasting** | 7-day forward predictions | MAPE <20%, better than naive baseline |
+| 4 | **Demand Forecasting** | 14-day forward predictions | MAPE <20%, better than naive baseline |
+| 7 | **Strategic Outlook** | 365-day revenue/orders plan | YoY delta vs last 365 days |
 | 5 | **Anomaly Detection** | Automatic unusual pattern alerts | Detection within same-day, severity classified |
 | 6 | **Reproducibility** | One-command deployment | Stack runs with single `docker-compose up` |
 
@@ -48,7 +49,8 @@ An online retail company processes thousands of transactions daily across multip
 | **CEO** | "Are we growing?" | Revenue and order trends |
 | **CFO** | "Where do we make money?" | Country and product profitability |
 | **CMO** | "Who are our best customers?" | Customer segmentation |
-| **COO** | "What do we need next week?" | Demand forecasting |
+| **COO** | "What do we need next two weeks?" | Demand forecasting |
+| **Strategy** | "Where are we headed this year?" | Yearly outlook |
 | **All** | "Did something break?" | Anomaly alerts |
 
 ---
@@ -171,7 +173,7 @@ Raw Data → Clean Data → Star Schema → BI Marts → Dashboards + ML
 
 ### 5. Demand Forecasting (ML)
 
-**The Insight:** Machine learning predicts next 7 days of revenue and orders.
+**The Insight:** Machine learning predicts next 14 days of revenue and orders.
 
 **Models:** Prophet + ETS (auto-selected via backtesting)
 - Captures weekly and yearly seasonality
@@ -189,7 +191,16 @@ Raw Data → Clean Data → Star Schema → BI Marts → Dashboards + ML
 - Cash flow planning
 
 **Example Forecast:**
-> "Next week revenue predicted: £45,000 - £55,000 (80% confidence). Plan inventory for 300-350 orders."
+> "Next two weeks revenue predicted: £90,000 - £110,000 (80% confidence). Plan inventory for 600-700 orders."
+
+### 5b. Strategic Yearly Outlook
+
+**The Insight:** A 365-day forecast provides a strategic growth plan and can be compared to the last 365 days for YoY deltas.
+
+**Business Impact:**
+- Annual budget planning
+- Growth targets tied to forecasted demand
+- Long-range inventory and staffing alignment
 
 ---
 
@@ -295,7 +306,8 @@ This BI platform transforms data from a passive asset into an **active driver of
 | **Are we growing?** | Yes, 15% YoY growth with seasonal peaks | ✅ High (complete data) |
 | **Where do we make money?** | UK 82%, EIRE 3%, Germany/France growing | ✅ High |
 | **Who are our best customers?** | 8% Champions = 35% revenue | ✅ High (RFM validated) |
-| **What happens next week?** | £45K-55K revenue, 300-350 orders | ⚠️ Medium (MAPE ~15%) |
+| **What happens in the next 2 weeks?** | £90K-110K revenue, 600-700 orders | ⚠️ Medium (MAPE ~15%) |
+| **What happens this year?** | 365-day revenue/orders plan with YoY delta | ⚠️ Medium (model-based) |
 | **Did something break?** | 3 anomalies last 30 days, 1 critical | ✅ High (automated) |
 
 ---
@@ -308,7 +320,7 @@ This BI platform transforms data from a passive asset into an **active driver of
 |----------|--------|----------|-----------------|
 | 🔴 HIGH | **Launch re-engagement campaign** for 847 "At Risk" high-value customers | RFM showing £125K lifetime value at risk | Prevent 10-15% churn = £12-18K saved |
 | 🔴 HIGH | **Investigate Nov 14 anomaly** - 67% revenue spike | Anomaly detection alert | Replicate success or identify data issue |
-| 🟡 MEDIUM | **Restock top 20 SKUs** based on forecast | 7-day demand prediction | Prevent stockouts during peak |
+| 🟡 MEDIUM | **Restock top 20 SKUs** based on forecast | 14-day demand prediction | Prevent stockouts during peak |
 
 #### SHORT-TERM ACTIONS (This Month)
 
@@ -348,7 +360,7 @@ After implementing recommended actions, monitor these KPIs:
 
 2. **Customer Value is Concentrated:** Protecting the top 8% of customers should be the #1 priority—they are irreplaceable in the short term.
 
-3. **Forecasting Enables Proactive Operations:** With 7-day visibility and 85% confidence, inventory and staffing can be planned rather than reactive.
+3. **Forecasting Enables Proactive Operations:** With 14-day visibility and 85% confidence, inventory and staffing can be planned rather than reactive.
 
 4. **Anomalies are Opportunities:** The Nov 14 spike wasn't a bug—it was a viral moment. The platform caught it; now the business should replicate it.
 

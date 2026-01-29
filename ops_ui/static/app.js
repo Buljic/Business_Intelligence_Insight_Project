@@ -113,6 +113,10 @@ document.getElementById("btn-ml").addEventListener("click", () => {
   handleAction("/api/train-ml", { method: "POST" }, "train ml");
 });
 
+document.getElementById("btn-ml-weekly").addEventListener("click", () => {
+  handleAction("/api/run-weekly-now", { method: "POST" }, "run weekly now");
+});
+
 document.getElementById("btn-backtest").addEventListener("click", () => {
   const metric = document.getElementById("backtest-metric").value;
   const model = document.getElementById("backtest-model").value;

@@ -61,7 +61,7 @@ app = FastAPI(
 
 class ForecastRequest(BaseModel):
     metric: str = "total_revenue"
-    forecast_days: int = 7
+    forecast_days: int = 14
     model: str = DEFAULT_FORECAST_MODEL
     
 class ForecastResponse(BaseModel):
@@ -579,15 +579,53 @@ def generate_report(forecasts: dict, anomalies: dict, report_path: str):
     ]
     
     # Forecast summary
-    report_lines.append("### Revenue Forecast (Next 7 Days)\n")
-    if "total_revenue" in forecasts:
-        for f in forecasts["total_revenue"][:7]:
+    report_lines.append("### Revenue Forecast (Next 14 Days)\n")
+    if "total_revenue" in forecasts and 14 in forecasts["total_revenue"]:
+        for f in forecasts["total_revenue"][14][:14]:
             report_lines.append(f"- **{f['date']}**: ${f['predicted']:,.2f} (range: ${f['lower_bound']:,.2f} - ${f['upper_bound']:,.2f})")
     
-    report_lines.append("\n### Orders Forecast (Next 7 Days)\n")
-    if "total_orders" in forecasts:
-        for f in forecasts["total_orders"][:7]:
+    report_lines.append("\n### Orders Forecast (Next 14 Days)\n")
+    if "total_orders" in forecasts and 14 in forecasts["total_orders"]:
+        for f in forecasts["total_orders"][14][:14]:
             report_lines.append(f"- **{f['date']}**: {int(f['predicted'])} orders (range: {int(f['lower_bound'])} - {int(f['upper_bound'])})")
+
+    # Yearly strategic summary
+    if "total_revenue" in forecasts and 365 in forecasts["total_revenue"]:
+        forecast_year_revenue = sum(f["predicted"] for f in forecasts["total_revenue"][365])
+        forecast_year_orders = None
+        if "total_orders" in forecasts and 365 in forecasts["total_orders"]:
+            forecast_year_orders = sum(f["predicted"] for f in forecasts["total_orders"][365])
+
+        try:
+            with engine.connect() as conn:
+                actuals = conn.execute(text("""
+                    SELECT
+                        SUM(total_revenue) as revenue,
+                        SUM(total_orders) as orders
+                    FROM mart_daily_kpis
+                    WHERE full_date >= (SELECT MAX(full_date) - INTERVAL '365 days' FROM mart_daily_kpis)
+                """)).fetchone()
+            actual_year_revenue = float(actuals[0] or 0)
+            actual_year_orders = float(actuals[1] or 0)
+        except Exception as exc:
+            logger.warning(f"Failed to compute yearly actuals: {exc}")
+            actual_year_revenue = 0
+            actual_year_orders = 0
+
+        report_lines.append("\n### Yearly Strategic Outlook (Next 365 Days)\n")
+        report_lines.append(f"- **Forecast Revenue (365d):** ${forecast_year_revenue:,.0f}")
+        if actual_year_revenue > 0:
+            delta_rev = forecast_year_revenue - actual_year_revenue
+            delta_rev_pct = (delta_rev / actual_year_revenue) * 100
+            report_lines.append(f"- **Last 365d Revenue:** ${actual_year_revenue:,.0f}")
+            report_lines.append(f"- **Delta vs Last Year:** ${delta_rev:,.0f} ({delta_rev_pct:+.1f}%)")
+        if forecast_year_orders is not None:
+            report_lines.append(f"- **Forecast Orders (365d):** {forecast_year_orders:,.0f}")
+            if actual_year_orders > 0:
+                delta_ord = forecast_year_orders - actual_year_orders
+                delta_ord_pct = (delta_ord / actual_year_orders) * 100
+                report_lines.append(f"- **Last 365d Orders:** {actual_year_orders:,.0f}")
+                report_lines.append(f"- **Delta vs Last Year:** {delta_ord:,.0f} ({delta_ord_pct:+.1f}%)")
     
     # Anomaly summary
     report_lines.append("\n---\n")
@@ -789,6 +827,7 @@ async def train_all_models(background_tasks: BackgroundTasks):
         model_selection = {}
         total_forecasts = 0
         total_anomalies = 0
+        forecast_horizons = [14, 365]
         
         for metric in metrics:
             logger.info(f"Selecting best model for {metric}")
@@ -797,7 +836,11 @@ async def train_all_models(background_tasks: BackgroundTasks):
             backtest_result = next(r for r in candidates if r["model_type"] == best_model)
 
             logger.info(f"Training {best_model} model for {metric}")
-            forecasts, model_params = forecast_with_model(df, metric, best_model, 7)
+            metric_forecasts = {}
+            model_params = {}
+            for horizon in forecast_horizons:
+                forecasts, model_params = forecast_with_model(df, metric, best_model, horizon)
+                metric_forecasts[horizon] = forecasts
             prepared = prepare_metric_series(df, metric)
 
             run_id = save_model_run(
@@ -815,15 +858,16 @@ async def train_all_models(background_tasks: BackgroundTasks):
                 baseline_rmse=backtest_result["baseline_rmse"]
             )
 
-            all_forecasts[metric] = forecasts
-            save_forecasts_to_db(
-                forecasts,
-                metric,
-                model_name=FORECAST_MODELS[best_model],
-                model_version=SERVICE_VERSION,
-                model_run_id=run_id
-            )
-            total_forecasts += len(forecasts)
+            all_forecasts[metric] = metric_forecasts
+            for horizon, horizon_forecasts in metric_forecasts.items():
+                save_forecasts_to_db(
+                    horizon_forecasts,
+                    metric,
+                    model_name=FORECAST_MODELS[best_model],
+                    model_version=SERVICE_VERSION,
+                    model_run_id=run_id
+                )
+                total_forecasts += len(horizon_forecasts)
 
             logger.info(f"Detecting anomalies for {metric}")
             df_indexed = df.set_index('ds')

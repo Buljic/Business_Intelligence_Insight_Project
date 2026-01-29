@@ -105,7 +105,7 @@ QUERY_LIBRARY: Dict[str, Dict[str, str]] = {
         """
     },
     "forecast_next_7d": {
-        "title": "Forecast Next 7 Days",
+        "title": "Forecast Next 14 Days",
         "sql": """
             SELECT
                 forecast_date,
@@ -116,7 +116,7 @@ QUERY_LIBRARY: Dict[str, Dict[str, str]] = {
             FROM ml_forecast_daily
             WHERE forecast_date >= CURRENT_DATE
             ORDER BY metric_name, forecast_date
-            LIMIT 14;
+            LIMIT 28;
         """
     },
     "data_freshness": {
@@ -134,6 +134,35 @@ QUERY_LIBRARY: Dict[str, Dict[str, str]] = {
             FROM table_refresh_log
             WHERE table_name IN ('mart_daily_kpis', 'mart_rfm', 'ml_forecast_daily')
             ORDER BY last_refresh_at DESC;
+        """
+    },
+    "yearly_outlook": {
+        "title": "Yearly Strategic Outlook",
+        "sql": """
+            WITH forecast_year AS (
+                SELECT
+                    SUM(CASE WHEN metric_name = 'total_revenue' THEN predicted_value ELSE 0 END) as forecast_revenue,
+                    SUM(CASE WHEN metric_name = 'total_orders' THEN predicted_value ELSE 0 END) as forecast_orders
+                FROM ml_forecast_daily
+                WHERE forecast_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '364 days'
+            ),
+            actual_year AS (
+                SELECT
+                    SUM(total_revenue) as actual_revenue,
+                    SUM(total_orders) as actual_orders
+                FROM mart_daily_kpis
+                WHERE full_date >= (SELECT MAX(full_date) - INTERVAL '365 days' FROM mart_daily_kpis)
+            )
+            SELECT
+                ROUND(forecast_revenue, 0) as forecast_revenue_365d,
+                ROUND(actual_revenue, 0) as last_365d_revenue,
+                ROUND(forecast_revenue - actual_revenue, 0) as delta_revenue,
+                ROUND((forecast_revenue - actual_revenue) / NULLIF(actual_revenue, 0) * 100, 2) as delta_revenue_pct,
+                ROUND(forecast_orders, 0) as forecast_orders_365d,
+                ROUND(actual_orders, 0) as last_365d_orders,
+                ROUND(forecast_orders - actual_orders, 0) as delta_orders,
+                ROUND((forecast_orders - actual_orders) / NULLIF(actual_orders, 0) * 100, 2) as delta_orders_pct
+            FROM forecast_year, actual_year;
         """
     }
 }
@@ -390,6 +419,35 @@ async def train_ml() -> JSONResponse:
             raise HTTPException(status_code=500, detail=response.text)
         return JSONResponse({"status": "success", "result": response.json()})
     except requests.RequestException as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/run-weekly-now")
+async def run_weekly_now() -> JSONResponse:
+    try:
+        response = requests.post(f"{ML_SERVICE_URL.rstrip('/')}/train", timeout=180)
+        if response.status_code >= 400:
+            raise HTTPException(status_code=500, detail=response.text)
+        anomalies = run_query(
+            """
+            SELECT
+                anomaly_date,
+                metric_name,
+                severity,
+                anomaly_type,
+                ROUND(deviation_pct, 2) as deviation_pct
+            FROM ml_anomalies_daily
+            WHERE anomaly_date >= CURRENT_DATE - INTERVAL '7 days'
+            ORDER BY anomaly_date DESC
+            LIMIT 10;
+            """
+        )
+        return JSONResponse({
+            "status": "success",
+            "result": response.json(),
+            "recent_anomalies": anomalies
+        })
+    except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
 

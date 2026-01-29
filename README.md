@@ -15,7 +15,8 @@ A comprehensive BI solution for monitoring e-commerce performance using modern d
 | Are we growing? | Revenue/Orders/AOV trend dashboards |
 | Where do we make money? | Country breakdown, product categories, top SKUs |
 | Who are our best customers? | RFM segmentation analysis |
-| What happens next week? | ML-powered 7-day forecasts |
+| What happens in the next 2 weeks? | ML-powered 14-day forecasts |
+| What about yearly growth? | 365-day strategic outlook |
 | Did something break today? | Anomaly detection with alerts |
 
 ## 🏗️ Architecture
@@ -219,8 +220,9 @@ Key environment variables (see `docker-compose.yml`):
 
 ### 4. AI/ML Dashboard
 - Actual vs Forecast comparison
-- 7-day revenue forecast
-- 7-day orders forecast
+- 14-day revenue forecast
+- 14-day orders forecast
+- 365-day strategic outlook (YoY delta)
 - Anomaly detection table
 - Alert severity breakdown
 

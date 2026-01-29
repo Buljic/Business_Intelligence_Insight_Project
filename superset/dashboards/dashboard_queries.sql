@@ -273,16 +273,16 @@ ORDER BY dd.full_date, "Revenue" DESC;
 -- DASHBOARD 4: AI/ML INSIGHTS - "DEMAND OUTLOOK & ALERTS"
 -- Purpose: Answer "What's next? What needs attention?"
 -- Audience: Operations, Planning, Management
--- Key Questions: What's the 7-day demand forecast? Are there anomalies?
+-- Key Questions: What's the 14-day demand forecast? Are there anomalies?
 -- 
 -- This is NOT a "random model output" page - it's a DECISION TOOL:
--- - "Next 7 Days Demand Outlook" with confidence bands
+-- - "Next 14 Days Demand Outlook" with confidence bands
 -- - "Alerts Requiring Attention" with business interpretation
 -- - "Model Performance" to build trust in predictions
 -- ============================================
 
 -- SECTION: "7-DAY DEMAND OUTLOOK"
--- Chart Title: "Revenue Forecast - Next 7 Days"
+-- Chart Title: "Revenue Forecast - Next 14 Days"
 -- Chart Description: "Best model forecast (Prophet/ETS) with 95% confidence interval. Use for inventory planning and staffing."
 -- 1. Revenue Forecast vs Actual (Line Chart)
 SELECT 
@@ -356,7 +356,7 @@ ORDER BY
         ELSE 4 
     END;
 
--- 5. Future Forecasts (Next 7 Days)
+-- 5. Future Forecasts (Next 14 Days)
 SELECT 
     forecast_date as "Date",
     metric_name as "Metric",
@@ -365,7 +365,8 @@ SELECT
     ROUND(upper_bound, 2) as "Upper Bound"
 FROM ml_forecast_daily
 WHERE forecast_date >= CURRENT_DATE
-ORDER BY metric_name, forecast_date;
+ORDER BY metric_name, forecast_date
+LIMIT 28;
 
 -- ============================================
 -- ADDITIONAL USEFUL QUERIES
@@ -487,26 +488,52 @@ GROUP BY target_metric, model_type
 ORDER BY target_metric, "Avg MAPE";
 
 -- SECTION: "7-DAY OUTLOOK SUMMARY"
--- Chart Title: "Next Week Demand Summary"
+-- Chart Title: "Next 14 Days Demand Summary"
 -- Use as KPI cards
 
--- Next 7 Days Total Revenue Forecast
+-- Next 14 Days Total Revenue Forecast
 SELECT 
     ROUND(SUM(predicted_value), 0) as "Forecasted Revenue",
     ROUND(SUM(lower_bound), 0) as "Conservative Estimate",
     ROUND(SUM(upper_bound), 0) as "Optimistic Estimate"
 FROM ml_forecast_daily
 WHERE metric_name = 'total_revenue'
-  AND forecast_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '6 days';
+  AND forecast_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '13 days';
 
--- Next 7 Days Total Orders Forecast  
+-- Next 14 Days Total Orders Forecast  
 SELECT 
     ROUND(SUM(predicted_value), 0) as "Forecasted Orders",
     ROUND(SUM(lower_bound), 0) as "Conservative Estimate",
     ROUND(SUM(upper_bound), 0) as "Optimistic Estimate"
 FROM ml_forecast_daily
 WHERE metric_name = 'total_orders'
-  AND forecast_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '6 days';
+  AND forecast_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '13 days';
+
+-- Yearly Strategic Outlook (Next 365 Days vs Last 365 Days)
+WITH forecast_year AS (
+    SELECT
+        SUM(CASE WHEN metric_name = 'total_revenue' THEN predicted_value ELSE 0 END) as forecast_revenue,
+        SUM(CASE WHEN metric_name = 'total_orders' THEN predicted_value ELSE 0 END) as forecast_orders
+    FROM ml_forecast_daily
+    WHERE forecast_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '364 days'
+),
+actual_year AS (
+    SELECT
+        SUM(total_revenue) as actual_revenue,
+        SUM(total_orders) as actual_orders
+    FROM mart_daily_kpis
+    WHERE full_date >= (SELECT MAX(full_date) - INTERVAL '365 days' FROM mart_daily_kpis)
+)
+SELECT
+    ROUND(forecast_revenue, 0) as "Forecast Revenue (365d)",
+    ROUND(actual_revenue, 0) as "Last 365d Revenue",
+    ROUND(forecast_revenue - actual_revenue, 0) as "Delta Revenue",
+    ROUND((forecast_revenue - actual_revenue) / NULLIF(actual_revenue, 0) * 100, 2) as "Delta Revenue %",
+    ROUND(forecast_orders, 0) as "Forecast Orders (365d)",
+    ROUND(actual_orders, 0) as "Last 365d Orders",
+    ROUND(forecast_orders - actual_orders, 0) as "Delta Orders",
+    ROUND((forecast_orders - actual_orders) / NULLIF(actual_orders, 0) * 100, 2) as "Delta Orders %"
+FROM forecast_year, actual_year;
 
 -- ============================================
 -- DATA FRESHNESS INDICATOR
