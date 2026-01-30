@@ -131,6 +131,8 @@ services:
       - ADMIN_USERNAME=admin
       - ADMIN_EMAIL=admin@example.com
       - ADMIN_PASSWORD=admin123
+      - WTF_CSRF_ENABLED=False
+      - SUPERSET_WEBSERVER_TIMEOUT=300
     ports:
       - "8088:8088"
     volumes:

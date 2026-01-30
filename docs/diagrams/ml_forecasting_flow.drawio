@@ -1,0 +1,146 @@
+<mxfile host="app.diagrams.net" modified="2025-01-30T18:00:00.000Z" agent="Cascade" version="22.1.0" type="device">
+  <diagram name="ML Forecasting Flow" id="ml-forecasting">
+    <mxGraphModel dx="1400" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="700" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Title -->
+        <mxCell id="title" value="Machine Learning Pipeline - Revenue Forecasting &amp; Anomaly Detection" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;fontColor=#1A1A1A;" vertex="1" parent="1">
+          <mxGeometry x="150" y="20" width="800" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- Input Data -->
+        <mxCell id="input-title" value="INPUT DATA" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="200" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="input-data" value="📊 mart_daily_kpis&#xa;&#xa;• date&#xa;• total_revenue&#xa;• total_orders&#xa;• avg_order_value&#xa;• unique_customers" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="50" y="120" width="180" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrow to Feature Engineering -->
+        <mxCell id="arrow1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#82b366;" edge="1" parent="1" source="input-data" target="feature-eng">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow1-label" value="Extract" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;fontStyle=1" vertex="1" connectable="0" parent="arrow1">
+          <mxGeometry x="-0.2" y="1" relative="1" as="geometry">
+            <mxPoint y="-10" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Feature Engineering -->
+        <mxCell id="feature-title" value="FEATURE ENGINEERING" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="280" y="80" width="250" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="feature-eng" value="🔧 Data Preparation&#xa;&#xa;• Resample to daily frequency&#xa;• Handle missing dates&#xa;• Outlier detection&#xa;• Log transformation (optional)&#xa;• Split train/test (14 days)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="280" y="120" width="220" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- Split to Two Models -->
+        <mxCell id="arrow2-prophet" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#9673a6;" edge="1" parent="1" source="feature-eng" target="prophet-model">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow2-iso" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#d79b00;" edge="1" parent="1" source="feature-eng" target="isolation-forest">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- Prophet Model -->
+        <mxCell id="prophet-title" value="FORECASTING (Prophet)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="100" y="260" width="250" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="prophet-model" value="📈 Facebook Prophet&#xa;&#xa;Parameters:&#xa;• Seasonality: daily, weekly&#xa;• Changepoint detection: auto&#xa;• Uncertainty: 95% interval&#xa;• Horizon: 14 days&#xa;&#xa;Output:&#xa;• yhat (prediction)&#xa;• yhat_lower (confidence)&#xa;• yhat_upper (confidence)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="80" y="300" width="200" height="150" as="geometry" />
+        </mxCell>
+        
+        <!-- Isolation Forest -->
+        <mxCell id="iso-title" value="ANOMALY DETECTION (Isolation Forest)" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="350" y="260" width="350" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="isolation-forest" value="🔍 Isolation Forest&#xa;&#xa;Parameters:&#xa;• Contamination: 0.05 (5%)&#xa;• n_estimators: 100 trees&#xa;• Features: revenue, orders, AOV&#xa;&#xa;Detection Logic:&#xa;• Anomaly score: -1 to 1&#xa;• Threshold: &lt; 0 = anomaly&#xa;• Severity: 0-10 scale&#xa;&#xa;Output:&#xa;• is_anomaly (boolean)&#xa;• anomaly_score&#xa;• severity_level" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;align=left;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="340" y="300" width="220" height="180" as="geometry" />
+        </mxCell>
+        
+        <!-- Backtesting -->
+        <mxCell id="backtest-arrow" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#b85450;dashed=1;" edge="1" parent="1" source="prophet-model" target="backtesting">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="750" y="375" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="backtest-title" value="MODEL VALIDATION" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="630" y="260" width="200" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="backtesting" value="✅ Backtesting&#xa;&#xa;• Hold-out: last 14 days&#xa;• Compare: actual vs predicted&#xa;&#xa;Metrics:&#xa;• MAPE (Mean Absolute % Error)&#xa;• RMSE (Root Mean Squared)&#xa;• MAE (Mean Absolute Error)&#xa;&#xa;Target: MAPE &lt; 15%" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="620" y="300" width="200" height="150" as="geometry" />
+        </mxCell>
+        
+        <!-- Model Tracking -->
+        <mxCell id="tracking-title" value="MODEL LIFECYCLE MANAGEMENT" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="850" y="80" width="220" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="model-runs" value="📊 ml_model_runs&#xa;&#xa;• run_id (UUID)&#xa;• metric_name&#xa;• model_type&#xa;• trained_at&#xa;• parameters (JSON)&#xa;• mape, rmse&#xa;• training_days&#xa;• is_active" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;verticalAlign=top;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="860" y="120" width="180" height="130" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="tracking-arrow" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#82b366;" edge="1" parent="1" source="backtesting" target="model-runs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="tracking-arrow-label" value="Save Metrics" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=9;fontStyle=1" vertex="1" connectable="0" parent="tracking-arrow">
+          <mxGeometry x="-0.2" y="1" relative="1" as="geometry">
+            <mxPoint y="-8" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Outputs -->
+        <mxCell id="output-title" value="PREDICTION OUTPUTS" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="500" width="1000" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="arrow3-forecast" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#9673a6;" edge="1" parent="1" source="prophet-model" target="forecast-output">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="180" y="540" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow3-anomaly" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#d79b00;" edge="1" parent="1" source="isolation-forest" target="anomaly-output">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="450" y="540" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="forecast-output" value="📈 ml_forecast_daily&#xa;&#xa;• run_id (FK)&#xa;• metric_name&#xa;• ds (forecast date)&#xa;• yhat (prediction)&#xa;• yhat_lower&#xa;• yhat_upper&#xa;• created_at&#xa;&#xa;14-day rolling forecast" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;verticalAlign=top;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="80" y="540" width="200" height="130" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="anomaly-output" value="🚨 ml_anomalies_daily&#xa;&#xa;• run_id (FK)&#xa;• metric_name&#xa;• date&#xa;• actual_value&#xa;• expected_value&#xa;• anomaly_score&#xa;• severity (0-10)&#xa;• detected_at&#xa;&#xa;Real-time alerts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;align=left;verticalAlign=top;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="340" y="540" width="200" height="130" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="backtest-output" value="📊 ml_backtest_results&#xa;&#xa;• run_id (FK)&#xa;• date&#xa;• actual&#xa;• predicted&#xa;• absolute_error&#xa;• percentage_error&#xa;&#xa;Historical validation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;verticalAlign=top;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="600" y="540" width="200" height="130" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="arrow-backtest-output" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=2;strokeColor=#b85450;" edge="1" parent="1" source="backtesting" target="backtest-output">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- Views -->
+        <mxCell id="views-output" value="📊 Analytics Views&#xa;&#xa;• v_active_alerts&#xa;  (severity ≥ 7)&#xa;&#xa;• v_model_performance&#xa;  (latest MAPE, RMSE)&#xa;&#xa;• v_forecast_vs_actual&#xa;  (accuracy tracking)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;verticalAlign=top;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="860" y="540" width="180" height="130" as="geometry" />
+        </mxCell>
+        
+        <!-- Automation Schedule -->
+        <mxCell id="schedule-box" value="⏰ AUTOMATION SCHEDULE&#xa;&#xa;• Weekly: Full model retraining (Sunday 2 AM)&#xa;• Daily: Anomaly detection (every midnight)&#xa;• On-demand: Manual trigger via UI&#xa;&#xa;All runs tracked in ml_model_runs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;align=left;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="860" y="300" width="180" height="120" as="geometry" />
+        </mxCell>
+        
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

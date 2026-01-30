@@ -12,6 +12,8 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from superset_automation import automate_superset_dashboards
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ops_ui")
 
@@ -294,8 +296,26 @@ def superset_get_csrf(session: requests.Session) -> None:
 
 def superset_create_db(session: requests.Session) -> int:
     db_url = f"{SUPERSET_URL.rstrip('/')}/api/v1/database/"
+    
+    # First, check if database already exists
+    logger.info("Checking for existing Superset database...")
+    try:
+        response = session.get(db_url, timeout=15)
+        if response.status_code == 200:
+            databases = response.json().get("result", [])
+            for db in databases:
+                db_name = db.get("database_name", "")
+                sqlalchemy_uri = db.get("sqlalchemy_uri", "")
+                if "ecommerce" in db_name.lower() or "ecommerce_dw" in sqlalchemy_uri:
+                    logger.info(f"Found existing database: {db_name} (ID: {db['id']})")
+                    return int(db["id"])
+    except Exception as e:
+        logger.warning(f"Could not check existing databases: {e}")
+    
+    # Create new database
+    logger.info("Creating new Superset database connection...")
     payload = {
-        "database_name": "E-Commerce Data Warehouse",
+        "database_name": "ecommerce_dw",
         "sqlalchemy_uri": "postgresql://postgres:postgres123@postgres:5432/ecommerce_dw",
         "expose_in_sqllab": True,
         "allow_ctas": True,
@@ -310,26 +330,51 @@ def superset_create_db(session: requests.Session) -> int:
             "schemas_allowed_for_file_upload": ["public"]
         })
     }
-    response = session.post(db_url, json=payload, timeout=30)
-    if response.status_code in (200, 201):
-        return int(response.json()["id"])
-    response = session.get(db_url, timeout=15)
-    if response.status_code == 200:
-        databases = response.json().get("result", [])
-        for db in databases:
-            if "ecommerce" in db.get("database_name", "").lower():
-                return int(db["id"])
-    raise RuntimeError(f"Superset DB create failed: {response.text}")
+    
+    try:
+        response = session.post(db_url, json=payload, timeout=30)
+        if response.status_code in (200, 201):
+            db_id = int(response.json()["id"])
+            logger.info(f"Successfully created database with ID: {db_id}")
+            return db_id
+        else:
+            logger.error(f"Database creation failed: {response.status_code} - {response.text}")
+            raise RuntimeError(f"Failed to create Superset database: {response.text}")
+    except requests.RequestException as e:
+        logger.error(f"Request failed: {e}")
+        raise RuntimeError(f"Failed to connect to Superset: {str(e)}")
 
 
 def superset_create_dataset(session: requests.Session, db_id: int, table_name: str) -> None:
     dataset_url = f"{SUPERSET_URL.rstrip('/')}/api/v1/dataset/"
+    
+    # Check if dataset already exists
+    try:
+        response = session.get(dataset_url, timeout=15)
+        if response.status_code == 200:
+            datasets = response.json().get("result", [])
+            for ds in datasets:
+                if ds.get("table_name") == table_name and ds.get("database", {}).get("id") == db_id:
+                    logger.info(f"Dataset '{table_name}' already exists")
+                    return
+    except Exception as e:
+        logger.warning(f"Could not check existing datasets: {e}")
+    
+    # Create dataset
     payload = {
         "database": db_id,
         "schema": "public",
         "table_name": table_name
     }
-    session.post(dataset_url, json=payload, timeout=30)
+    
+    try:
+        response = session.post(dataset_url, json=payload, timeout=30)
+        if response.status_code in (200, 201):
+            logger.info(f"Created dataset: {table_name}")
+        else:
+            logger.warning(f"Dataset creation for '{table_name}' returned {response.status_code}")
+    except Exception as e:
+        logger.error(f"Failed to create dataset '{table_name}': {e}")
 
 
 @app.get("/", response_class=FileResponse)
@@ -452,7 +497,7 @@ async def run_weekly_now() -> JSONResponse:
 
 
 @app.post("/api/setup-superset")
-async def setup_superset() -> JSONResponse:
+async def setup_superset_endpoint() -> JSONResponse:
     try:
         session = requests.Session()
         superset_login(session)
@@ -463,6 +508,7 @@ async def setup_superset() -> JSONResponse:
             "mart_rfm",
             "mart_country_performance",
             "mart_product_performance",
+            "mart_monthly_trends",
             "ml_forecast_daily",
             "ml_anomalies_daily",
             "v_forecast_vs_actual",
@@ -483,6 +529,75 @@ async def setup_superset() -> JSONResponse:
         })
     except Exception as exc:
         logger.error("Superset setup failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/create-dashboards")
+async def create_dashboards_endpoint() -> JSONResponse:
+    """Automatically create all Superset dashboards and charts"""
+    try:
+        logger.info("Starting automated dashboard creation...")
+        result = automate_superset_dashboards(
+            SUPERSET_URL,
+            SUPERSET_USERNAME,
+            SUPERSET_PASSWORD
+        )
+        
+        if result.get("status") == "error":
+            raise HTTPException(status_code=500, detail=result.get("message"))
+        
+        return JSONResponse(result)
+    except Exception as exc:
+        logger.error("Dashboard automation failed: %s", exc)
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
+@app.post("/api/create-forecast-dataset")
+async def create_forecast_dataset_endpoint() -> JSONResponse:
+    """Create virtual dataset for forecast vs actual visualization"""
+    try:
+        from superset_automation import SupersetAPI
+        
+        # SQL query combining historical and forecast data
+        sql_query = """
+        SELECT 
+            full_date as date,
+            total_revenue as value,
+            'Actual' as type
+        FROM mart_daily_kpis
+        WHERE full_date >= CURRENT_DATE - INTERVAL '30 days'
+
+        UNION ALL
+
+        SELECT 
+            forecast_date as date,
+            predicted_value as value,
+            'Forecast' as type
+        FROM ml_forecast_daily
+        WHERE metric_name = 'total_revenue'
+            AND forecast_date >= CURRENT_DATE
+
+        ORDER BY date
+        """
+        
+        api = SupersetAPI(SUPERSET_URL, SUPERSET_USERNAME, SUPERSET_PASSWORD)
+        dataset_id = api.create_virtual_dataset(
+            dataset_name="revenue_actual_vs_forecast",
+            sql_query=sql_query
+        )
+        
+        if dataset_id:
+            return JSONResponse({
+                "status": "success",
+                "dataset_id": dataset_id,
+                "dataset_name": "revenue_actual_vs_forecast",
+                "message": "Virtual dataset created successfully. Go to Charts -> + Chart -> Select 'revenue_actual_vs_forecast' dataset"
+            })
+        else:
+            raise HTTPException(status_code=500, detail="Failed to create virtual dataset")
+            
+    except Exception as exc:
+        logger.error("Failed to create forecast dataset: %s", exc)
         raise HTTPException(status_code=500, detail=str(exc))
 
 

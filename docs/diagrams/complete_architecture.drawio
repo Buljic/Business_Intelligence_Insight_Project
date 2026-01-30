@@ -1,0 +1,228 @@
+<mxfile host="app.diagrams.net" modified="2025-01-30T18:00:00.000Z" agent="Cascade" version="22.1.0" type="device">
+  <diagram name="Complete BI Architecture" id="complete-architecture">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Title -->
+        <mxCell id="title" value="E-Commerce BI Platform - Complete Architecture" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=24;fontStyle=1;fontColor=#1A1A1A;" vertex="1" parent="1">
+          <mxGeometry x="400" y="20" width="600" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- Layer 1: Data Sources -->
+        <mxCell id="layer1-title" value="LAYER 1: DATA SOURCES" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="300" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="csv-source" value="📄 CSV Files&#xa;(data.csv, source.csv)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=12;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="80" y="120" width="200" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrow 1 -->
+        <mxCell id="arrow1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#82b366;fillColor=#d5e8d4;" edge="1" parent="1" source="csv-source" target="staging">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="180" y="220" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow1-label" value="CSV Import" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;fontStyle=1" vertex="1" connectable="0" parent="arrow1">
+          <mxGeometry x="-0.2" y="1" relative="1" as="geometry">
+            <mxPoint as="offset" x="30" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Layer 2: Staging -->
+        <mxCell id="layer2-title" value="LAYER 2: STAGING (RAW DATA)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="210" width="300" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="staging" value="🗄️ staging_ecommerce&#xa;&#xa;Raw CSV data&#xa;No transformations&#xa;Full audit trail" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=11;align=center;" vertex="1" parent="1">
+          <mxGeometry x="80" y="250" width="200" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrow 2 -->
+        <mxCell id="arrow2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#82b366;fillColor=#d5e8d4;" edge="1" parent="1" source="staging" target="star-schema">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="180" y="380" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow2-label" value="ETL Transform" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;fontStyle=1" vertex="1" connectable="0" parent="arrow2">
+          <mxGeometry x="-0.2" y="1" relative="1" as="geometry">
+            <mxPoint as="offset" x="35" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Layer 3: Star Schema -->
+        <mxCell id="layer3-title" value="LAYER 3: DATA WAREHOUSE (STAR SCHEMA)" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="360" width="400" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="star-schema" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;opacity=20;" vertex="1" parent="1">
+          <mxGeometry x="50" y="400" width="550" height="200" as="geometry" />
+        </mxCell>
+        
+        <!-- Dimensions -->
+        <mxCell id="dim-date" value="📅 dim_date" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="80" y="420" width="100" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="dim-customer" value="👤 dim_customer" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="200" y="420" width="120" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="dim-product" value="📦 dim_product" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="340" y="420" width="110" height="40" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="dim-country" value="🌍 dim_country" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="470" y="420" width="110" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- Fact Table -->
+        <mxCell id="fact-sales" value="⭐ fact_sales&#xa;&#xa;• sales_key (PK)&#xa;• date_key (FK)&#xa;• customer_key (FK)&#xa;• product_key (FK)&#xa;• country_key (FK)&#xa;• quantity&#xa;• unit_price&#xa;• total_amount" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;verticalAlign=top;" vertex="1" parent="1">
+          <mxGeometry x="200" y="490" width="150" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- Lines from dimensions to fact -->
+        <mxCell id="line1" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#666;" edge="1" parent="1" source="dim-date" target="fact-sales">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="line2" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#666;" edge="1" parent="1" source="dim-customer" target="fact-sales">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="line3" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#666;" edge="1" parent="1" source="dim-product" target="fact-sales">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="line4" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#666;" edge="1" parent="1" source="dim-country" target="fact-sales">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrow 3 -->
+        <mxCell id="arrow3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#82b366;" edge="1" parent="1" source="star-schema" target="bi-marts">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="700" y="500" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow3-label" value="Aggregation" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;fontStyle=1" vertex="1" connectable="0" parent="arrow3">
+          <mxGeometry x="-0.2" y="1" relative="1" as="geometry">
+            <mxPoint x="10" y="-15" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Layer 4: BI Marts -->
+        <mxCell id="layer4-title" value="LAYER 4: BI MARTS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="650" y="360" width="300" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="bi-marts" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;opacity=20;" vertex="1" parent="1">
+          <mxGeometry x="650" y="400" width="300" height="200" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="mart1" value="📊 mart_daily_kpis" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="670" y="420" width="130" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="mart2" value="👥 mart_rfm" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="810" y="420" width="120" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="mart3" value="🌍 mart_country_perf" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="670" y="460" width="130" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="mart4" value="📦 mart_product_perf" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="810" y="460" width="120" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="mart5" value="📈 mart_monthly_trends" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="670" y="500" width="130" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrow 4 -->
+        <mxCell id="arrow4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#6c8ebf;" edge="1" parent="1" source="mart1" target="ml-layer">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1050" y="500" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow4-label" value="ML Training" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;fontStyle=1" vertex="1" connectable="0" parent="arrow4">
+          <mxGeometry x="-0.2" y="1" relative="1" as="geometry">
+            <mxPoint x="15" y="-15" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Layer 5: ML Pipeline -->
+        <mxCell id="layer5-title" value="LAYER 5: MACHINE LEARNING" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="360" width="350" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="ml-layer" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;opacity=20;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="400" width="350" height="200" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="ml-models" value="🤖 ML Models&#xa;&#xa;• Prophet (Forecasting)&#xa;• Isolation Forest (Anomalies)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;" vertex="1" parent="1">
+          <mxGeometry x="1020" y="420" width="150" height="70" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="ml-outputs" value="📈 ML Outputs&#xa;&#xa;• ml_forecast_daily&#xa;• ml_anomalies_daily&#xa;• ml_model_runs&#xa;• ml_backtest_results" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;" vertex="1" parent="1">
+          <mxGeometry x="1190" y="420" width="140" height="100" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="ml-arrow" style="endArrow=classic;html=1;strokeWidth=2;strokeColor=#9673a6;" edge="1" parent="1" source="ml-models" target="ml-outputs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="ml-tracking" value="📊 ml_model_runs&#xa;(Version tracking)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="1020" y="510" width="150" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrow 5 to Visualization -->
+        <mxCell id="arrow5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#d79b00;" edge="1" parent="1" source="bi-marts" target="visualization">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="800" y="650" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <mxCell id="arrow5-ml" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeWidth=3;strokeColor=#d79b00;" edge="1" parent="1" source="ml-outputs" target="visualization">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="800" y="650" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Layer 6: Visualization -->
+        <mxCell id="layer6-title" value="LAYER 6: VISUALIZATION &amp; CONTROL" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#666;" vertex="1" parent="1">
+          <mxGeometry x="40" y="630" width="400" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="visualization" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;opacity=20;" vertex="1" parent="1">
+          <mxGeometry x="50" y="670" width="900" height="180" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="superset" value="📊 Apache Superset&#xa;&#xa;• Executive Dashboard&#xa;• RFM Segmentation&#xa;• ML Insights&#xa;• Auto-created charts" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;align=left;" vertex="1" parent="1">
+          <mxGeometry x="80" y="700" width="200" height="120" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="ops-ui" value="🎮 BI Control Center&#xa;&#xa;• CSV Import&#xa;• Run ETL&#xa;• Train ML&#xa;• DQ Checks&#xa;• Create Dashboards&#xa;• Health Monitoring" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=11;align=left;" vertex="1" parent="1">
+          <mxGeometry x="320" y="700" width="200" height="120" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="users" value="👥 Business Users&#xa;&#xa;• Executives&#xa;• Data Analysts&#xa;• Marketing Team&#xa;• Finance Team" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;align=left;" vertex="1" parent="1">
+          <mxGeometry x="560" y="700" width="180" height="120" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="apis" value="🔌 REST APIs&#xa;&#xa;• Superset API&#xa;• Control API&#xa;• ML Service API" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=11;align=left;" vertex="1" parent="1">
+          <mxGeometry x="770" y="700" width="160" height="120" as="geometry" />
+        </mxCell>
+        
+        <!-- Technology Stack -->
+        <mxCell id="tech-stack" value="🔧 Technology Stack&#xa;&#xa;🐘 PostgreSQL 15 | 🐍 Python 3.11 | ⚡ FastAPI&#xa;📈 Prophet | 🔍 Isolation Forest | 📊 Superset&#xa;🐳 Docker Compose | 🌐 REST APIs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;align=center;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1000" y="670" width="350" height="100" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="metrics" value="📊 Key Metrics&#xa;&#xa;⚡ Dashboard: &lt;500ms&#xa;🎯 Forecast MAPE: 8-12%&#xa;🤖 Automation: 2h → 30s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;align=left;fontStyle=0" vertex="1" parent="1">
+          <mxGeometry x="1000" y="790" width="350" height="60" as="geometry" />
+        </mxCell>
+        
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -186,6 +186,13 @@ if (btnSuperset) {
   });
 }
 
+const btnCreateDashboards = document.getElementById("btn-create-dashboards");
+if (btnCreateDashboards) {
+  btnCreateDashboards.addEventListener("click", () => {
+    handleAction("/api/create-dashboards", { method: "POST" }, "create dashboards");
+  });
+}
+
 // Initial health check and periodic refresh
 refreshHealth();
 setInterval(refreshHealth, 20000);
