@@ -1,9 +1,18 @@
-const outputPre = document.getElementById("output-pre");
-const outputTable = document.getElementById("output-table");
-const statusDb = document.getElementById("status-db");
-const statusMl = document.getElementById("status-ml");
+document.addEventListener("DOMContentLoaded", function() {
+  console.log("BI Control Center UI initialized");
+
+  const outputPre = document.getElementById("output-pre");
+  const outputTable = document.getElementById("output-table");
+  const statusDb = document.getElementById("status-db");
+  const statusMl = document.getElementById("status-ml");
+
+  if (!outputPre || !outputTable || !statusDb || !statusMl) {
+    console.error("Critical UI elements not found!");
+    return;
+  }
 
 function setStatus(el, ok, label) {
+  if (!el) return;
   el.textContent = label + ": " + (ok ? "ok" : "down");
   el.style.borderColor = ok ? "rgba(55, 214, 194, 0.6)" : "rgba(255, 120, 120, 0.6)";
 }
@@ -91,61 +100,94 @@ async function handleAction(url, options, title) {
   }
 }
 
-document.getElementById("btn-etl").addEventListener("click", () => {
-  handleAction("/api/run-etl", { method: "POST" }, "run etl");
-});
+// Button event listeners with null checks
+const btnEtl = document.getElementById("btn-etl");
+if (btnEtl) {
+  btnEtl.addEventListener("click", () => {
+    handleAction("/api/run-etl", { method: "POST" }, "run etl");
+  });
+}
 
-document.getElementById("btn-import").addEventListener("click", () => {
-  const runEtl = document.getElementById("import-run-etl").checked;
-  const runMl = document.getElementById("import-run-ml").checked;
-  handleAction("/api/import-csv", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ run_etl: runEtl, run_ml: runMl })
-  }, "import csv");
-});
+const btnImport = document.getElementById("btn-import");
+if (btnImport) {
+  btnImport.addEventListener("click", () => {
+    const runEtl = document.getElementById("import-run-etl")?.checked || false;
+    const runMl = document.getElementById("import-run-ml")?.checked || false;
+    handleAction("/api/import-csv", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ run_etl: runEtl, run_ml: runMl })
+    }, "import csv");
+  });
+}
 
-document.getElementById("btn-dq").addEventListener("click", () => {
-  handleAction("/api/run-dq", { method: "POST" }, "run dq");
-});
+const btnDq = document.getElementById("btn-dq");
+if (btnDq) {
+  btnDq.addEventListener("click", () => {
+    handleAction("/api/run-dq", { method: "POST" }, "run dq");
+  });
+}
 
-document.getElementById("btn-ml").addEventListener("click", () => {
-  handleAction("/api/train-ml", { method: "POST" }, "train ml");
-});
+const btnMl = document.getElementById("btn-ml");
+if (btnMl) {
+  btnMl.addEventListener("click", () => {
+    handleAction("/api/train-ml", { method: "POST" }, "train ml");
+  });
+}
 
-document.getElementById("btn-ml-weekly").addEventListener("click", () => {
-  handleAction("/api/run-weekly-now", { method: "POST" }, "run weekly now");
-});
+const btnMlWeekly = document.getElementById("btn-ml-weekly");
+if (btnMlWeekly) {
+  btnMlWeekly.addEventListener("click", () => {
+    handleAction("/api/run-weekly-now", { method: "POST" }, "run weekly now");
+  });
+}
 
-document.getElementById("btn-backtest").addEventListener("click", () => {
-  const metric = document.getElementById("backtest-metric").value;
-  const model = document.getElementById("backtest-model").value;
-  const testDays = parseInt(document.getElementById("backtest-days").value, 10);
-  handleAction("/api/backtest", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ metric, model, test_days: testDays })
-  }, "backtest");
-});
+const btnBacktest = document.getElementById("btn-backtest");
+if (btnBacktest) {
+  btnBacktest.addEventListener("click", () => {
+    const metric = document.getElementById("backtest-metric")?.value || "total_revenue";
+    const model = document.getElementById("backtest-model")?.value || "auto";
+    const testDays = parseInt(document.getElementById("backtest-days")?.value || "14", 10);
+    handleAction("/api/backtest", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ metric, model, test_days: testDays })
+    }, "backtest");
+  });
+}
 
 document.querySelectorAll("[data-query]").forEach((button) => {
   button.addEventListener("click", () => {
     const key = button.getAttribute("data-query");
-    handleAction(`/api/query/${key}`, { method: "GET" }, key);
+    if (key) {
+      handleAction(`/api/query/${key}`, { method: "GET" }, key);
+    }
   });
 });
 
-document.getElementById("btn-forecasts").addEventListener("click", () => {
-  handleAction("/api/forecasts/latest", { method: "GET" }, "forecasts latest");
-});
+const btnForecasts = document.getElementById("btn-forecasts");
+if (btnForecasts) {
+  btnForecasts.addEventListener("click", () => {
+    handleAction("/api/forecasts/latest", { method: "GET" }, "forecasts latest");
+  });
+}
 
-document.getElementById("btn-anomalies").addEventListener("click", () => {
-  handleAction("/api/anomalies/latest", { method: "GET" }, "anomalies latest");
-});
+const btnAnomalies = document.getElementById("btn-anomalies");
+if (btnAnomalies) {
+  btnAnomalies.addEventListener("click", () => {
+    handleAction("/api/anomalies/latest", { method: "GET" }, "anomalies latest");
+  });
+}
 
-document.getElementById("btn-superset").addEventListener("click", () => {
-  handleAction("/api/setup-superset", { method: "POST" }, "setup superset");
-});
+const btnSuperset = document.getElementById("btn-superset");
+if (btnSuperset) {
+  btnSuperset.addEventListener("click", () => {
+    handleAction("/api/setup-superset", { method: "POST" }, "setup superset");
+  });
+}
 
+// Initial health check and periodic refresh
 refreshHealth();
 setInterval(refreshHealth, 20000);
+
+}); // End of DOMContentLoaded

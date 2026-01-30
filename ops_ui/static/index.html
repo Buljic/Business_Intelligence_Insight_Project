@@ -31,7 +31,7 @@
         <label class="toggle"><input type="checkbox" id="import-run-ml" />Train ML after import</label>
       </div>
       <div class="controls">
-        <button id="btn-import">Import CSV</button>
+        <button type="button" id="btn-import">Import CSV</button>
       </div>
     </div>
 
@@ -39,8 +39,8 @@
       <h3>Pipeline Actions</h3>
       <p>Run the ETL or data quality checks from a single place.</p>
       <div class="controls">
-        <button id="btn-etl">Run Full ETL</button>
-        <button class="secondary" id="btn-dq">Run DQ Checks</button>
+        <button type="button" id="btn-etl">Run Full ETL</button>
+        <button type="button" class="secondary" id="btn-dq">Run DQ Checks</button>
       </div>
     </div>
 
@@ -48,8 +48,8 @@
       <h3>ML Actions</h3>
       <p>Train models or run a quick backtest to compare options.</p>
       <div class="controls">
-        <button id="btn-ml">Train Models</button>
-        <button class="secondary" id="btn-ml-weekly">Run Weekly Now</button>
+        <button type="button" id="btn-ml">Train Models</button>
+        <button type="button" class="secondary" id="btn-ml-weekly">Run Weekly Now</button>
       </div>
       <div style="margin-top: 12px; display: grid; gap: 8px;">
         <label for="backtest-metric">Backtest metric</label>
@@ -65,7 +65,7 @@
         </select>
         <label for="backtest-days">Test days</label>
         <input id="backtest-days" type="number" value="14" min="7" max="60" />
-        <button class="secondary" id="btn-backtest">Run Backtest</button>
+        <button type="button" class="secondary" id="btn-backtest">Run Backtest</button>
       </div>
     </div>
 
@@ -73,12 +73,12 @@
       <h3>Business Queries</h3>
       <p>Load curated results for quick inspection and demos.</p>
       <div class="controls">
-        <button data-query="executive_summary">Executive Summary</button>
-        <button data-query="country_top10">Top Countries</button>
-        <button data-query="rfm_segments">RFM Segments</button>
-        <button data-query="forecast_next_7d">Forecast 14D</button>
-        <button data-query="latest_anomalies">Latest Anomalies</button>
-        <button data-query="yearly_outlook">Yearly Outlook</button>
+        <button type="button" data-query="executive_summary">Executive Summary</button>
+        <button type="button" data-query="country_top10">Top Countries</button>
+        <button type="button" data-query="rfm_segments">RFM Segments</button>
+        <button type="button" data-query="forecast_next_7d">Forecast 14D</button>
+        <button type="button" data-query="latest_anomalies">Latest Anomalies</button>
+        <button type="button" data-query="yearly_outlook">Yearly Outlook</button>
       </div>
     </div>
 
@@ -86,8 +86,8 @@
       <h3>ML Outputs</h3>
       <p>Fetch the latest forecasts and anomalies from the ML service.</p>
       <div class="controls">
-        <button id="btn-forecasts">Latest Forecasts</button>
-        <button class="secondary" id="btn-anomalies">Latest Anomalies</button>
+        <button type="button" id="btn-forecasts">Latest Forecasts</button>
+        <button type="button" class="secondary" id="btn-anomalies">Latest Anomalies</button>
       </div>
     </div>
 
@@ -95,7 +95,7 @@
       <h3>Data Freshness</h3>
       <p>Confirm marts and ML outputs are recently refreshed.</p>
       <div class="controls">
-        <button data-query="data_freshness">Check Freshness</button>
+        <button type="button" data-query="data_freshness">Check Freshness</button>
       </div>
     </div>
 
@@ -103,7 +103,7 @@
       <h3>Superset Setup</h3>
       <p>Create the Superset database connection and register datasets.</p>
       <div class="controls">
-        <button id="btn-superset">Setup Superset</button>
+        <button type="button" id="btn-superset">Setup Superset</button>
       </div>
     </div>
   </section>
